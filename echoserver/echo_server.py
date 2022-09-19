@@ -12,10 +12,13 @@ s.listen()
 print(f"Listening on {HOST}:{PORT} for HTTP connections")
 
 while True:
+    frags = []
     conn, addr = s.accept()
     print(f"Connected to {addr}")
-    data = conn.recv(1024)
-    if not data:
+    data_frag = conn.recv(1024)
+    frags.append(data_frag)
+    if not data_frag:
+        data = "".join(frags)
+        conn.sendall(data)
+        conn.close()
         break
-    conn.sendall(data)
-    conn.close()
