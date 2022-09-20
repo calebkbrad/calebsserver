@@ -10,12 +10,15 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind((HOST, PORT))
 s.listen()
 print(f"Listening on {HOST}:{PORT} for HTTP connections")
-
+data = B""
 while True:
     conn, addr = s.accept()
     print(f"Connected to {addr}")
-    data = conn.recv(1024)
-    if not data:
-        break
-    conn.sendall(data)
-    conn.close()
+    while True:
+        data_frag = conn.recv(1024)
+        data += data_frag
+        if len(data_frag) < 1024:   
+            conn.sendall(data)
+            conn.close()
+            break
+    break
