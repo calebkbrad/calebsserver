@@ -15,18 +15,19 @@ def main(argv):
     s.bind((HOST, PORT))
     s.listen()
     print(f"Listening on {HOST}:{PORT} for HTTP connections")
-    data = B""
     while True:
-        conn, addr = s.accept()
-        print(f"Connected to {addr}")
+        data = B""
         while True:
-            data_frag = conn.recv(1024)
-            data += data_frag
-            if len(data_frag) < 1024:   
-                conn.sendall(data)
-                conn.close()
-                break
-        break
+            conn, addr = s.accept()
+            print(f"Connected to {addr}")
+            while True:
+                data_frag = conn.recv(1024)
+                data += data_frag
+                if len(data_frag) < 1024:   
+                    conn.sendall(data)
+                    conn.close()
+                    break
+            break
 
 if __name__ == "__main__":
     main(sys.argv[1:])
