@@ -4,6 +4,7 @@ import socket
 import sys
 import re
 
+# Validate whether a request is valid
 def validate_request(http_request: bytes) -> bool:
     separate_lines = http_request.split(b'\n')
 
@@ -11,14 +12,19 @@ def validate_request(http_request: bytes) -> bool:
     if len(separate_lines) == 1:
         return False
     
-    # Ensure Host header is included
-    if b'Host: calebsserver' not in separate_lines:
+    # Ensure Host header is included exactly once
+    if sum(1 for line in separate_lines if b'Host: ' in line) != 1:
         return False
 
+    # Ensure Host header is to my server?
+    if b'Host: calebsserver' not in separate_lines:
+        return False
+    
     # Validate request line
     request_line = separate_lines[0].decode('utf-8')
-    return bool(re.match(r"[A-Z]+ /[A-Za-z\./]* HTTP/1.1", request_line))
+    return bool(re.match(r"[A-Z]+ /[A-Za-z\./]* HTTP/\d.\d", request_line))
 
+# Extract relevant info from a request, return it as a list
 def get_request_info(http_request: bytes) -> list:
     info = []
     separate_lines = http_request.split(b'\n')
@@ -35,6 +41,8 @@ def get_request_info(http_request: bytes) -> list:
 def check_method(method: str) -> bool:
     # Check if a method is currently supported
     return method in ['GET', 'HEAD', 'OPTIONS', 'TRACE']
+
+
 
 def main(argv):
     # HOST = "0.0.0.0"
@@ -62,7 +70,7 @@ def main(argv):
     #                 break
     #         break
 
-    test_request1 = b"GET /myserver/whoaohdoashdo/img.html HTTP/1.1\nHost: calebserver\nConnection: close"
+    test_request1 = b"GET /myserver/whoaohdoashdo/img.html HTTP/1.1\nHost: calebsserver\nConnection: close"
     print(validate_request(test_request1))
 
 if __name__ == "__main__":
