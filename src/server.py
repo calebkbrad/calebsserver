@@ -5,7 +5,6 @@ import sys
 import re
 
 def validate_request(http_request: bytes) -> bool:
-    print('validating http request')
     separate_lines = http_request.split(b'\n')
 
     # Ensure that there are newlines separating 
@@ -21,7 +20,6 @@ def validate_request(http_request: bytes) -> bool:
     return bool(re.match(r"[A-Z]+ /[A-Za-z\./]* HTTP/1.1", request_line))
 
 def get_request_info(http_request: bytes) -> list:
-    print('oh woah')
     info = []
     separate_lines = http_request.split(b'\n')
 
@@ -33,6 +31,10 @@ def get_request_info(http_request: bytes) -> list:
     # Eventually handle headers too
 
     return info
+
+def check_method(method: str) -> bool:
+    # Check if a method is currently supported
+    return method in ['GET', 'HEAD', 'OPTIONS', 'TRACE']
 
 def main(argv):
     # HOST = "0.0.0.0"
