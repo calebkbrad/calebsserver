@@ -17,9 +17,22 @@ def validate_request(http_request: bytes) -> bool:
         return False
 
     # Validate request line
-    request_line = separate_lines[0]
-    return bool(re.match(r"[A-Z]+ /[A-Za-z\./]* HTTP/1.1", request_line.decode('utf-8')))
+    request_line = separate_lines[0].decode('utf-8')
+    return bool(re.match(r"[A-Z]+ /[A-Za-z\./]* HTTP/1.1", request_line))
 
+def get_request_info(http_request: bytes) -> list:
+    print('oh woah')
+    info = []
+    separate_lines = http_request.split(b'\n')
+
+    # Handle first element (info from request line)
+    request_line = separate_lines[0].decode('utf-8')
+    request_line_info = request_line.split(' ')
+    info.append(request_line_info)
+    
+    # Eventually handle headers too
+
+    return info
 
 def main(argv):
     # HOST = "0.0.0.0"
