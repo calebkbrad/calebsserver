@@ -3,6 +3,7 @@
 import socket
 import sys
 import re
+import string
 
 # Validate whether a request is valid
 def validate_request(http_request: bytes) -> bool:
@@ -22,7 +23,18 @@ def validate_request(http_request: bytes) -> bool:
     
     # Validate request line
     request_line = separate_lines[0].decode('utf-8')
-    return bool(re.match(r"[A-Z]+ /[A-Za-z\./]* HTTP/\d.\d", request_line))
+    request_line_elements = request_line.split(' ')
+    if len(request_line_elements) != 3:
+        return False
+    method = request_line_elements[0]
+    uri = request_line_elements[1]
+    http_version = request_line_elements[2]
+    if not(method.isupper() and method.isalpha()):
+        return False
+    if not(re.match(r"/[A-Za-z\./]*", uri) or re.search("github.com/calebkbrad/calebsserver", uri)):
+        return False
+    return bool(re.match(r'HTTP/\d\.\d', http_version))
+
 
 # Extract relevant info from a request, return it as a list
 def get_request_info(http_request: bytes) -> list:
@@ -70,7 +82,7 @@ def main(argv):
     #                 break
     #         break
 
-    test_request1 = b"GET /myserver/whoaohdoashdo/img.html HTTP/1.1\nHost: calebsserver\nConnection: close"
+    test_request1 = b"GET www.github.com/calebkbrad/calebsserver.com HTTP/1.1\nHost: calebsserver\nConnection: close"
     print(validate_request(test_request1))
 
 if __name__ == "__main__":
