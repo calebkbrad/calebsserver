@@ -3,7 +3,7 @@
 import socket
 import sys
 import re
-import string
+import time
 
 # Validate whether a request is valid
 def validate_request(http_request: bytes) -> bool:
@@ -54,7 +54,15 @@ def check_method(method: str) -> bool:
     # Check if a method is currently supported
     return method in ['GET', 'HEAD', 'OPTIONS', 'TRACE']
 
+def check_version(http_version: bytes) -> bool:
+    # Check if version 1.1 is being used
+    return http_version == b"HTTP/1.1"
 
+def generate_date_header() -> bytes:
+    current_time = time.strftime("%a, %d %b %Y %I:%M:%S %p GMT", time.gmtime())
+    time_bytes = current_time.encode('utf-8')
+    print(type(time_bytes))
+    return b'Date: ' + time_bytes
 
 def main(argv):
     # HOST = "0.0.0.0"
