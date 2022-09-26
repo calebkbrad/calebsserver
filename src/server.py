@@ -4,10 +4,21 @@ import socket
 import sys
 import re
 import time
+from os.path import exists
+
+status_codes = {
+    "200": "OK",
+    "400": "Bad Request",
+    "403": "Forbidden",
+    "404": "Not Found",
+    "500": "Internal Server Error",
+    "501": "Not Implemented",
+    "505": "HTTP Version not Supported"
+}
 
 # Validate whether a request is valid
 def validate_request(http_request: bytes) -> bool:
-    separate_lines = http_request.split(b'\n')
+    separate_lines = http_request.split(b'\r\n')
 
     # Ensure that there are newlines separating 
     if len(separate_lines) == 1:
@@ -50,48 +61,61 @@ def get_request_info(http_request: bytes) -> list:
 
     return info
 
+# Check if a method is currently supported
 def check_method(method: str) -> bool:
-    # Check if a method is currently supported
     return method in ['GET', 'HEAD', 'OPTIONS', 'TRACE']
 
+# Check if version 1.1 is being used
 def check_version(http_version: bytes) -> bool:
-    # Check if version 1.1 is being used
     return http_version == b"HTTP/1.1"
 
+# Generate date header with current time
 def generate_date_header() -> bytes:
     current_time = time.strftime("%a, %d %b %Y %I:%M:%S %p GMT", time.gmtime())
     time_bytes = current_time.encode('utf-8')
     print(type(time_bytes))
     return b'Date: ' + time_bytes
 
+# Check if a resource exists, given a normalized uri (relative path)
+def check_resource(uri:bytes) -> bool:
+    return exists(uri)
+
+def generate_text_payload(valid_uri:bytes) -> bytes:
+    print('generating payload')
+    
+
+
 def main(argv):
-    # HOST = "0.0.0.0"
-    # if not argv:
-    #     PORT = 80
-    # else:
-    #     PORT = int(argv[0])
+    HOST = "0.0.0.0"
+    if not argv:
+        PORT = 80
+    else:
+        PORT = int(argv[0])
 
-    # s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    # s.bind((HOST, PORT))
-    # s.listen()
-    # print(f"Listening on {HOST}:{PORT} for HTTP connections")
-    # while True:
-    #     data = B""
-    #     while True:
-    #         conn, addr = s.accept()
-    #         print(f"Connected to {addr}")
-    #         while True:
-    #             data_frag = conn.recv(1024)
-    #             data += data_frag
-    #             if len(data_frag) < 1024:   
-    #                 conn.sendall(data)
-    #                 conn.close()
-    #                 break
-    #         break
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind((HOST, PORT))
+    s.listen()
+    print(f"Listening on {HOST}:{PORT} for HTTP connections")
+    while True:
+        data = B""
+        while True:
+            conn, addr = s.accept()
+            print(f"Connected to {addr}")
+            while True:
+                data_frag = conn.recv(1024)
+                data += data_frag
+                if len(data_frag) < 1024:   
+                    conn.sendall(data)
+                    conn.close()
+                    break
+            break
 
-    test_request1 = b"GET www.github.com/calebkbrad/calebsserver.com HTTP/1.1\nHost: calebsserver\nConnection: close"
+
+
+    test_request1 = b"GET www.github.com/calebkbrad/calebsserver.com HTTP/1.1\r\nHost: calebsserver\r\nConnection: close\r\n\r\n"
     print(validate_request(test_request1))
+    print(check_resource(b'mypage.html'))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
