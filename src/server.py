@@ -100,7 +100,6 @@ def generate_content_length(valid_uri: str) -> bytes:
     return b'Content-Length: ' + str(file_size).encode('ascii') + b'\r\n'
 
 def generate_content_type(valid_uri: str) -> bytes:
-    # valid_file = valid_uri.decode('utf-8')
     content_type = b''
     for mime_type in mime_types.keys():
         if valid_uri.endswith(mime_type):
@@ -117,8 +116,10 @@ def generate_last_modified(valid_uri: str):
     return b'Last-Modified: ' + time_bytes + b'\r\n'
 
 def generate_server() -> bytes:
-    return b'Server: calebsserver'
+    return b'Server: calebsserver' + b'\r\n'
     
+def generate_allow() -> bytes:
+    return b'Allow: GET, HEAD, OPTIONS, TRACE\r\n'
 
 def generate_status_code(status_code: int) -> bytes:
     return b'HTTP/1.1 ' + status_codes[str(status_code)] + b'\r\n'
@@ -132,7 +133,16 @@ def generate_error_response(status: int) -> bytes:
     full_response += generate_date_header()
     full_response += generate_server()
     full_response += b'Connection: close' + b'\r\n'
-    return full_response + b'\r\n'
+    return full_response
+
+def generate_success_response_headers(uri: str) -> bytes:
+    headers = b''
+    headers += generate_date_header()
+    headers += generate_server()
+    headers += generate_content_type(uri)
+    headers += generate_last_modified(uri)
+    headers += generate_content_length(uri)
+    return headers
 
 # Check if a resource exists, given a normalized uri (relative path)
 def check_resource(uri: str) -> bool:
@@ -186,18 +196,30 @@ def main(argv):
                     conn.close()
                     break
 
-                
-                conn.send(generate_content_length(info[0][1]) + b'\r\n')
-                conn.send(generate_content_type(info[0][1]) + b'\r\n')
-                conn.send(generate_date_header() + b'\r\n')
-                conn.send(generate_last_modified(info[0][1]))
+                # Handle OPTIONS execution
+                if method == "OPTIONS":
+                    conn.send(generate_error_response(200))
+                    conn.send(generate_allow())
+                # Handle HEAD execution
+                elif method == "HEAD":
+                    conn.send(generate_status_code(200))
+                    conn.send(generate_success_response_headers(uri))
+                # Handle TRACE execution
+                elif method == "TRACE":
+                    conn.send(generate_error_response(200))
+                    conn.send(data)
+                # Handle GET execution
+                elif method == "GET":
+                    conn.send(generate_status_code(200))
+                    conn.send(generate_success_response_headers(uri))
+
             else:
                 conn.send(generate_error_response(400))
             conn.close()
             break
 
 
-    # GET /index.html HTTP/1.0\r\nHost: calebsserver\r\nConnection: close\r\n\r\n
+    # OPTIONS /index.html HTTP/1.1\r\nHost: calebsserver\r\nConnection: close\r\n\r\n
     # test_request1 = b"GET www.github.com/calebkbrad/calebsserver HTTP/1.1\r\nHost: calebsserver\r\nConnection: close\r\n\r\n"
     # print(validate_request(test_request1))
     # print(check_resource(b'mypage.html'))
