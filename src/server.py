@@ -74,6 +74,7 @@ def get_request_info(http_request: bytes) -> list:
     # Handle first element (info from request line)
     request_line = separate_lines[0].decode('utf-8')
     request_line_info = request_line.split(' ')
+    request_line_info[1] = "." + request_line_info[1]
     info.append(request_line_info)
     
     # Eventually handle headers too
@@ -85,18 +86,18 @@ def check_method(method: str) -> bool:
     return method in ['GET', 'HEAD', 'OPTIONS', 'TRACE']
 
 # Check if version 1.1 is being used
-def check_version(http_version: bytes) -> bool:
-    return http_version == b"HTTP/1.1"
+def check_version(http_version: str) -> bool:
+    return http_version == "HTTP/1.1"
 
 # Generate date header with current time
 def generate_date_header() -> bytes:
     current_time = time.strftime("%a, %d %b %Y %I:%M:%S %p GMT", time.gmtime())
     time_bytes = current_time.encode('ascii')
-    return b'Date: ' + time_bytes
+    return b'Date: ' + time_bytes + b'\r\n'
 
 def generate_content_length(valid_uri: str) -> bytes:
     file_size = os.path.getsize(valid_uri)
-    return b'Content-Length: ' + str(file_size).encode('ascii')
+    return b'Content-Length: ' + str(file_size).encode('ascii') + b'\r\n'
 
 def generate_content_type(valid_uri: str) -> bytes:
     # valid_file = valid_uri.decode('utf-8')
@@ -107,10 +108,31 @@ def generate_content_type(valid_uri: str) -> bytes:
     if content_type == b'':
         content_type += b'application/octet-stream'
     
-    return b'Content-Type: ' + content_type
+    return b'Content-Type: ' + content_type + b'\r\n'
 
-def generate_reponse(status: int, file) -> bytes:
+def generate_last_modified(valid_uri: str):
+    time_since_epoch = os.path.getmtime(valid_uri)
+    last_m_time = time.strftime("%a, %d %b %Y %I:%M:%S %p GMT", time.localtime(time_since_epoch))
+    time_bytes = last_m_time.encode('ascii')
+    return b'Last-Modified: ' + time_bytes + b'\r\n'
+
+def generate_server() -> bytes:
+    return b'Server: calebsserver'
+    
+
+def generate_status_code(status_code: int) -> bytes:
+    return b'HTTP/1.1 ' + status_codes[str(status_code)] + b'\r\n'
+
+def generate_reponse(status: int, info: list) -> bytes:
     print('os')
+
+def generate_error_response(status: int) -> bytes:
+    full_response = b''
+    full_response += generate_status_code(status)
+    full_response += generate_date_header()
+    full_response += generate_server()
+    full_response += b'Connection: close' + b'\r\n'
+    return full_response + b'\r\n'
 
 # Check if a resource exists, given a normalized uri (relative path)
 def check_resource(uri: str) -> bool:
@@ -145,23 +167,41 @@ def main(argv):
                     break
             data = data.decode('unicode_escape').encode("raw_unicode_escape")
             if validate_request(data):
-                conn.send(b'That was a valid request good job!\r\n')
                 info = get_request_info(data)
+                method = info[0][0]
+                uri = info[0][1]
+                version = info[0][2]
+
+                # Return error responses if appropriate
+                if not check_method(method):
+                    conn.send(generate_error_response(501))
+                    conn.close()
+                    break
+                if not check_resource(uri):
+                    conn.send(generate_error_response(404))
+                    conn.close()
+                    break
+                if not check_version(version):
+                    conn.send(generate_error_response(505))
+                    conn.close()
+                    break
+
+                
                 conn.send(generate_content_length(info[0][1]) + b'\r\n')
                 conn.send(generate_content_type(info[0][1]) + b'\r\n')
                 conn.send(generate_date_header() + b'\r\n')
+                conn.send(generate_last_modified(info[0][1]))
             else:
-                conn.send(b'That was a bad request and you should feel bad')
-                print(data)
+                conn.send(generate_error_response(400))
             conn.close()
             break
 
 
-    # GET ./index.html HTTP/1.1\r\nHost: calebsserver\r\nConnection: close\r\n\r\n
+    # GET /index.html HTTP/1.0\r\nHost: calebsserver\r\nConnection: close\r\n\r\n
     # test_request1 = b"GET www.github.com/calebkbrad/calebsserver HTTP/1.1\r\nHost: calebsserver\r\nConnection: close\r\n\r\n"
     # print(validate_request(test_request1))
     # print(check_resource(b'mypage.html'))
-    print(generate_content_type(b'../index.html'))
+    # print(generate_content_type(b'/index.html'))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
