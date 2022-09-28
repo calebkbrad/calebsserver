@@ -82,7 +82,7 @@ def get_request_info(http_request: bytes) -> list:
         request_line_info[1] = request_line_info[1].split("cs531-cs_cbrad022",1)[1]
     elif request_line_info[1] == "*":
         request_line_info[1] = "/"
-    request_line_info[1] = "." + request_line_info[1]
+    request_line_info[1] = "./a1-test/2" + request_line_info[1]
     info.append(request_line_info)
     
     # Eventually handle request headers too
