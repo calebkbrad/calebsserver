@@ -7,6 +7,7 @@ import time
 from os.path import exists
 import os
 
+# Dictionary of status codes
 status_codes = {
     "200": b"200 OK",
     "400": b"400 Bad Request",
@@ -17,6 +18,7 @@ status_codes = {
     "505": b"505 HTTP Version not Supported"
 }
 
+# Dictionary of mime types
 mime_types = {
     ".txt": b'text/plain',
     ".html": b'text/html',
@@ -60,7 +62,7 @@ def validate_request(http_request: bytes) -> bool:
     if not(method.isupper() and method.isalpha()):
         # print('Fails 5 check')
         return False
-    if not(re.match(r"\.*/[A-Za-z\./]*", uri) or re.search("github.com/calebkbrad/calebsserver", uri)):
+    if not(uri == "*" or re.match(r"/[A-Za-z\./]*", uri) or re.search("github.com/calebkbrad/calebsserver", uri)):
         # print('Fails 6 check')
         return False
     return bool(re.match(r'HTTP/\d\.\d', http_version))
@@ -74,10 +76,15 @@ def get_request_info(http_request: bytes) -> list:
     # Handle first element (info from request line)
     request_line = separate_lines[0].decode('utf-8')
     request_line_info = request_line.split(' ')
+
+    if 'github.com/calebkbrad/calebsserver' in request_line_info[1]:
+        request_line_info[1] = request_line_info[1].split("calebsserver",1)[1]
+    elif request_line_info[1] == "*":
+        request_line_info[1] = "/"
     request_line_info[1] = "." + request_line_info[1]
     info.append(request_line_info)
     
-    # Eventually handle headers too
+    # Eventually handle request headers too
 
     return info
 
@@ -95,10 +102,12 @@ def generate_date_header() -> bytes:
     time_bytes = current_time.encode('ascii')
     return b'Date: ' + time_bytes + b'\r\n'
 
+# Generate Content-Length header given a valid uri
 def generate_content_length(valid_uri: str) -> bytes:
     file_size = os.path.getsize(valid_uri)
     return b'Content-Length: ' + str(file_size).encode('ascii') + b'\r\n'
 
+# Generate Content-Type header given a valid uri
 def generate_content_type(valid_uri: str) -> bytes:
     content_type = b''
     for mime_type in mime_types.keys():
@@ -109,24 +118,26 @@ def generate_content_type(valid_uri: str) -> bytes:
     
     return b'Content-Type: ' + content_type + b'\r\n'
 
+# Generate Last-Modified header given a valid uri
 def generate_last_modified(valid_uri: str):
     time_since_epoch = os.path.getmtime(valid_uri)
     last_m_time = time.strftime("%a, %d %b %Y %I:%M:%S %p GMT", time.localtime(time_since_epoch))
     time_bytes = last_m_time.encode('ascii')
     return b'Last-Modified: ' + time_bytes + b'\r\n'
 
+# Generate Server header
 def generate_server() -> bytes:
     return b'Server: calebsserver' + b'\r\n'
     
+# Generate Allow header
 def generate_allow() -> bytes:
     return b'Allow: GET, HEAD, OPTIONS, TRACE\r\n'
 
+# Generate status code
 def generate_status_code(status_code: int) -> bytes:
     return b'HTTP/1.1 ' + status_codes[str(status_code)] + b'\r\n'
 
-def generate_reponse(status: int, info: list) -> bytes:
-    print('os')
-
+# Generate generic response headers not associated with content
 def generate_error_response(status: int) -> bytes:
     full_response = b''
     full_response += generate_status_code(status)
@@ -135,6 +146,7 @@ def generate_error_response(status: int) -> bytes:
     full_response += b'Connection: close' + b'\r\n'
     return full_response
 
+# Generate respones headers associated with found content
 def generate_success_response_headers(uri: str) -> bytes:
     headers = b''
     headers += generate_date_header()
@@ -148,11 +160,12 @@ def generate_success_response_headers(uri: str) -> bytes:
 def check_resource(uri: str) -> bool:
     return exists(uri)
 
-def generate_text_payload(valid_uri:bytes) -> bytes:
-    print('generating payload')
+def generate_text_payload(valid_uri: str) -> bytes:
+    with open(valid_uri, 'r') as f:
+        file_contents = f.read()
+    file_contents = file_contents.encode('ascii')
+    return file_contents
     
-
-
 def main(argv):
     HOST = "0.0.0.0"
     if not argv:
@@ -207,23 +220,21 @@ def main(argv):
                 # Handle TRACE execution
                 elif method == "TRACE":
                     conn.send(generate_error_response(200))
+                    conn.send(b'Content-Type: message/http\r\n\r\n')
                     conn.send(data)
                 # Handle GET execution
                 elif method == "GET":
                     conn.send(generate_status_code(200))
                     conn.send(generate_success_response_headers(uri))
-
+                    if b'text' in generate_content_type(uri):
+                        conn.send(b'\r\n' + generate_text_payload(uri))
             else:
                 conn.send(generate_error_response(400))
             conn.close()
             break
 
 
-    # OPTIONS /index.html HTTP/1.1\r\nHost: calebsserver\r\nConnection: close\r\n\r\n
-    # test_request1 = b"GET www.github.com/calebkbrad/calebsserver HTTP/1.1\r\nHost: calebsserver\r\nConnection: close\r\n\r\n"
-    # print(validate_request(test_request1))
-    # print(check_resource(b'mypage.html'))
-    # print(generate_content_type(b'/index.html'))
+    # GET /index.html HTTP/1.1\r\nHost: calebsserver\r\nConnection: close\r\n\r\n
 
 if __name__ == "__main__":
     main(sys.argv[1:])
