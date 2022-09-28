@@ -78,8 +78,8 @@ def get_request_info(http_request: bytes) -> list:
     request_line = separate_lines[0].decode('utf-8')
     request_line_info = request_line.split(' ')
 
-    if 'github.com/calebkbrad/calebsserver' in request_line_info[1]:
-        request_line_info[1] = request_line_info[1].split("calebsserver",1)[1]
+    if 'cs531-cs_cbrad022' in request_line_info[1]:
+        request_line_info[1] = request_line_info[1].split("cs531-cs_cbrad022",1)[1]
     elif request_line_info[1] == "*":
         request_line_info[1] = "/"
     request_line_info[1] = "." + request_line_info[1]
@@ -212,22 +212,22 @@ def main(argv):
 
                 # Return error responses if appropriate
                 if not check_method(method):
-                    conn.send(generate_error_response(501))
+                    conn.send(generate_error_response(501) + b'\r\n')
                     conn.close()
                     break
                 if not check_resource(uri):
-                    conn.send(generate_error_response(404))
+                    conn.send(generate_error_response(404) + b'\r\n')
                     conn.close()
                     break
                 if not check_version(version):
-                    conn.send(generate_error_response(505))
+                    conn.send(generate_error_response(505) + b'\r\n')
                     conn.close()
                     break
 
                 # Handle OPTIONS execution
                 if method == "OPTIONS":
                     conn.send(generate_error_response(200))
-                    conn.send(generate_allow())
+                    conn.send(generate_allow() + b'\r\n')
                 # Handle HEAD execution
                 elif method == "HEAD":
                     conn.send(generate_status_code(200))
@@ -240,12 +240,12 @@ def main(argv):
                 # Handle GET execution
                 elif method == "GET":
                     conn.send(generate_status_code(200))
-                    conn.send(generate_success_response_headers(uri))
+                    conn.send(generate_success_response_headers(uri) + b'\r\n')
                     if b'text' in generate_content_type(uri):
                         conn.send(b'\r\n' + generate_text_payload(uri))
                     write_to_log(addr[0], request_line, 200, uri)
             else:
-                conn.send(generate_error_response(400))
+                conn.send(generate_error_response(400) + b'\r\n')
             conn.close()
             break
 
