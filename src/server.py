@@ -47,7 +47,7 @@ def validate_request(http_request: bytes) -> bool:
         return False
 
     # Ensure Host header is to my server?
-    if b'Host: calebsserver' not in separate_lines:
+    if b'Host: cs531-cs_cbrad022' not in separate_lines:
         print('Fails 3 check')
         return False
     
