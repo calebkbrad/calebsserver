@@ -210,6 +210,12 @@ def main(argv):
                 uri = info[0][1]
                 version = info[0][2]
 
+                # Handle TRACE execution
+                if method == "TRACE":
+                    conn.send(generate_error_response(200))
+                    conn.send(b'Content-Type: message/http\r\n\r\n')
+                    conn.send(data)
+
                 # Return error responses if appropriate
                 if not check_method(method):
                     conn.send(generate_error_response(501) + b'\r\n')
@@ -232,11 +238,6 @@ def main(argv):
                 elif method == "HEAD":
                     conn.send(generate_status_code(200))
                     conn.send(generate_success_response_headers(uri))
-                # Handle TRACE execution
-                elif method == "TRACE":
-                    conn.send(generate_error_response(200))
-                    conn.send(b'Content-Type: message/http\r\n\r\n')
-                    conn.send(data)
                 # Handle GET execution
                 elif method == "GET":
                     conn.send(generate_status_code(200))
