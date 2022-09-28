@@ -99,7 +99,7 @@ def check_version(http_version: str) -> bool:
 
 # Generate date header with current time
 def generate_date_header() -> bytes:
-    current_time = time.strftime("%a, %d %b %Y %I:%M:%S %p GMT", time.gmtime())
+    current_time = time.strftime("%a, %d %b %Y %I:%M:%S GMT", time.gmtime())
     time_bytes = current_time.encode('ascii')
     return b'Date: ' + time_bytes + b'\r\n'
 
@@ -122,7 +122,7 @@ def generate_content_type(valid_uri: str) -> bytes:
 # Generate Last-Modified header given a valid uri
 def generate_last_modified(valid_uri: str):
     time_since_epoch = os.path.getmtime(valid_uri)
-    last_m_time = time.strftime("%a, %d %b %Y %I:%M:%S %p GMT", time.localtime(time_since_epoch))
+    last_m_time = time.strftime("%a, %d %b %Y %I:%M:%S GMT", time.localtime(time_since_epoch))
     time_bytes = last_m_time.encode('ascii')
     return b'Last-Modified: ' + time_bytes + b'\r\n'
 
