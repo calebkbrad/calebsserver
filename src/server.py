@@ -63,7 +63,7 @@ def validate_request(http_request: bytes) -> bool:
     if not(method.isupper() and method.isalpha()):
         print('Fails 5 check')
         return False
-    if not(uri == "*" or re.match(r"/[A-Za-z\./]*", uri) or re.search("github.com/calebkbrad/calebsserver", uri)):
+    if not(uri == "*" or re.match(r"/[A-Za-z\./]*", uri) or 'cs531-cs_cbrad022' in uri):
         print('Fails 6 check')
         return False
     return bool(re.match(r'HTTP/\d\.\d', http_version))
