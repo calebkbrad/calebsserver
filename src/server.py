@@ -215,6 +215,8 @@ def main(argv):
                     conn.send(generate_error_response(200))
                     conn.send(b'Content-Type: message/http\r\n\r\n')
                     conn.send(data)
+                    conn.close()
+                    break
 
                 # Return error responses if appropriate
                 if not check_method(method):
