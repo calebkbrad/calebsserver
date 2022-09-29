@@ -14,5 +14,6 @@ COPY    src/server.py /app
 COPY    settings /app
 
 RUN     chmod a+x server.py
+RUN     pip install yaml
 
 ENTRYPOINT [ "./server.py" ]
