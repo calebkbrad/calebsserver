@@ -11,6 +11,7 @@ RUN     wget https://raw.githubusercontent.com/ibnesayeed/webserver-tester/maste
 WORKDIR /app
 
 COPY    src/server.py /app
+COPY    settings /app
 
 RUN     chmod a+x server.py
 

@@ -6,6 +6,10 @@ import re
 import time
 from os.path import exists
 import os
+import yaml
+
+config = yaml.safe_load(open("./settings/config.yml"))
+WEBROOT = config["WEBROOT"]
 
 # Dictionary of status codes
 status_codes = {
@@ -82,7 +86,7 @@ def get_request_info(http_request: bytes) -> list:
         request_line_info[1] = request_line_info[1].split("cs531-cs_cbrad022",1)[1]
     elif request_line_info[1] == "*":
         request_line_info[1] = "/"
-    request_line_info[1] = "." + request_line_info[1]
+    request_line_info[1] = WEBROOT + request_line_info[1]
     info.append(request_line_info)
     
     # Eventually handle request headers too
@@ -181,11 +185,11 @@ def write_to_log(addr: str, request: bytes, status: int, uri: str):
         f.write(log_entry.decode("utf-8"))
     
 def main(argv):
-    HOST = "0.0.0.0"
+    HOST = config["ADDRESS"]
     if not argv:
-        PORT = 80
+         PORT = config["PORT"]
     else:
-        PORT = int(argv[0])
+         PORT = int(argv[0])
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -253,7 +257,7 @@ def main(argv):
             break
 
 
-    # GET /index.html HTTP/1.1\r\nHost: calebsserver\r\nConnection: close\r\n\r\n
+    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /.well-known/access.log HTTP/1.1\r\nHost: calebsserver\r\nConnection: close\r\n\r\n
 if __name__ == "__main__":
     main(sys.argv[1:])
