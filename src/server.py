@@ -181,7 +181,7 @@ def write_to_log(addr: str, request: bytes, status: int, uri: str):
         content_length = os.path.getsize(uri)
         log_entry += str(content_length).encode('ascii')
     log_entry += b'\n'
-    with open('./.well-known/access.log', 'a') as f:
+    with open('./access.log', 'a') as f:
         f.write(log_entry.decode("utf-8"))
     
 def main(argv):
@@ -219,20 +219,24 @@ def main(argv):
                     conn.send(generate_error_response(200))
                     conn.send(b'Content-Type: message/http\r\n\r\n')
                     conn.send(data)
+                    write_to_log(addr[0], request_line, 200, uri)
                     conn.close()
                     break
 
                 # Return error responses if appropriate
                 if not check_method(method):
                     conn.send(generate_error_response(501) + b'\r\n')
+                    write_to_log(addr[0], request_line, 501, uri)
                     conn.close()
                     break
                 if not check_resource(uri):
                     conn.send(generate_error_response(404) + b'\r\n')
+                    write_to_log(addr[0], request_line, 404, uri)
                     conn.close()
                     break
                 if not check_version(version):
                     conn.send(generate_error_response(505) + b'\r\n')
+                    write_to_log(addr[0], request_line, 505, uri)
                     conn.close()
                     break
 
@@ -240,10 +244,12 @@ def main(argv):
                 if method == "OPTIONS":
                     conn.send(generate_error_response(200))
                     conn.send(generate_allow() + b'\r\n')
+                    write_to_log(addr[0], request_line, 200, uri)
                 # Handle HEAD execution
                 elif method == "HEAD":
                     conn.send(generate_status_code(200))
                     conn.send(generate_success_response_headers(uri))
+                    write_to_log(addr[0], request_line, 200, uri)
                 # Handle GET execution
                 elif method == "GET":
                     conn.send(generate_status_code(200))
