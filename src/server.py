@@ -248,7 +248,7 @@ def main(argv):
                 # Handle HEAD execution
                 elif method == "HEAD":
                     conn.send(generate_status_code(200))
-                    conn.send(generate_success_response_headers(uri))
+                    conn.send(generate_success_response_headers(uri) + b'\r\n')
                     write_to_log(addr[0], request_line, 200, uri)
                 # Handle GET execution
                 elif method == "GET":
