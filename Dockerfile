@@ -14,6 +14,6 @@ COPY    src/server.py /app
 COPY    settings /app
 
 RUN     chmod a+x server.py
-RUN     pip install yaml
+RUN     pip install pyyaml
 
 ENTRYPOINT [ "./server.py" ]
