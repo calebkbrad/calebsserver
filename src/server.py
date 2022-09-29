@@ -213,6 +213,8 @@ def main(argv):
                 method = info[0][0]
                 uri = info[0][1]
                 version = info[0][2]
+                print(method)
+                print(uri)
 
                 # Handle TRACE execution
                 if method == "TRACE":
@@ -229,17 +231,25 @@ def main(argv):
                     write_to_log(addr[0], request_line, 501, uri)
                     conn.close()
                     break
-                if not check_resource(uri):
-                    conn.send(generate_error_response(404) + b'\r\n')
-                    write_to_log(addr[0], request_line, 404, uri)
-                    conn.close()
-                    break
                 if not check_version(version):
                     conn.send(generate_error_response(505) + b'\r\n')
                     write_to_log(addr[0], request_line, 505, uri)
                     conn.close()
                     break
-
+                if uri == "./var/www/.well-known/access.log":
+                    conn.send(generate_status_code(200))
+                    conn.send(generate_success_response_headers('./access.log') + b'\r\n')
+                    conn.send(b'\r\n' + generate_text_payload('./access.log'))
+                    write_to_log(addr[0], request_line, 200, './access.log')
+                    conn.close()
+                    break
+                if not check_resource(uri):
+                    conn.send(generate_error_response(404) + b'\r\n')
+                    conn.send(uri.encode('ascii'))
+                    write_to_log(addr[0], request_line, 404, uri)
+                    conn.close()
+                    break
+                
                 # Handle OPTIONS execution
                 if method == "OPTIONS":
                     conn.send(generate_error_response(200))
@@ -264,6 +274,6 @@ def main(argv):
 
 
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
-    # GET /.well-known/access.log HTTP/1.1\r\nHost: calebsserver\r\nConnection: close\r\n\r\n
+    # GET /.well-known/access.log HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
 if __name__ == "__main__":
     main(sys.argv[1:])
