@@ -168,10 +168,16 @@ def generate_success_response_headers(uri: str) -> bytes:
 def check_resource(uri: str) -> bool:
     return exists(uri)
 
-def generate_text_payload(valid_uri: str) -> bytes:
-    with open(valid_uri, 'r') as f:
-        file_contents = f.read()
-    file_contents = file_contents.encode('ascii')
+def generate_payload(valid_uri: str) -> bytes:
+    with open(valid_uri, 'rb') as f:
+        file_contents = b''
+        byte = b''
+        while True:
+            byte = f.read(1)
+            file_contents += byte
+            if not byte:
+                break
+    file_contents += CRLF
     return file_contents
 
 def write_to_log(addr: str, request: bytes, status: int, uri: str):
@@ -265,8 +271,10 @@ def main(argv):
                 elif method == "GET":
                     conn.send(generate_status_code(200))
                     conn.send(generate_success_response_headers(uri) + CRLF)
-                    if b'text' in generate_content_type(uri):
-                        conn.send(CRLF + generate_text_payload(uri))
+                    mime_type = generate_content_type(uri)
+                    conn.send(generate_payload(uri))
+                        
+
                     write_to_log(addr[0], request_line, 200, uri)
             else:
                 conn.send(generate_error_response(400) + CRLF)
@@ -274,7 +282,7 @@ def main(argv):
             break
 
 
-    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /.well-known/access.log HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
 if __name__ == "__main__":
     main(sys.argv[1:])
