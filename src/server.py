@@ -7,7 +7,7 @@ import time
 from os.path import exists
 import os
 import yaml
-import urllib
+import urllib.parse
 
 CRLF = b'\r\n'
 
