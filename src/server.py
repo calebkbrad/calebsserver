@@ -177,7 +177,6 @@ def generate_payload(valid_uri: str) -> bytes:
             file_contents += byte
             if not byte:
                 break
-    file_contents += CRLF
     return file_contents
 
 def write_to_log(addr: str, request: bytes, status: int, uri: str):
