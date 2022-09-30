@@ -7,6 +7,9 @@ import time
 from os.path import exists
 import os
 import yaml
+import urllib
+
+CRLF = b'\r\n'
 
 config = yaml.safe_load(open("./settings/config.yml"))
 WEBROOT = config["WEBROOT"]
@@ -38,7 +41,7 @@ mime_types = {
 
 # Validate whether a request is valid
 def validate_request(http_request: bytes) -> bool:
-    separate_lines = http_request.split(b'\r\n')
+    separate_lines = http_request.split(CRLF)
 
     # Ensure that there are newlines separating 
     if len(separate_lines) == 1:
@@ -76,7 +79,7 @@ def validate_request(http_request: bytes) -> bool:
 # Extract relevant info from a request, return it as a list
 def get_request_info(http_request: bytes) -> list:
     info = []
-    separate_lines = http_request.split(b'\r\n')
+    separate_lines = http_request.split(CRLF)
 
     # Handle first element (info from request line)
     request_line = separate_lines[0].decode('utf-8')
@@ -105,12 +108,12 @@ def check_version(http_version: str) -> bool:
 def generate_date_header() -> bytes:
     current_time = time.strftime("%a, %d %b %Y %I:%M:%S GMT", time.gmtime())
     time_bytes = current_time.encode('ascii')
-    return b'Date: ' + time_bytes + b'\r\n'
+    return b'Date: ' + time_bytes + CRLF
 
 # Generate Content-Length header given a valid uri
 def generate_content_length(valid_uri: str) -> bytes:
     file_size = os.path.getsize(valid_uri)
-    return b'Content-Length: ' + str(file_size).encode('ascii') + b'\r\n'
+    return b'Content-Length: ' + str(file_size).encode('ascii') + CRLF
 
 # Generate Content-Type header given a valid uri
 def generate_content_type(valid_uri: str) -> bytes:
@@ -121,18 +124,18 @@ def generate_content_type(valid_uri: str) -> bytes:
     if content_type == b'':
         content_type += b'application/octet-stream'
     
-    return b'Content-Type: ' + content_type + b'\r\n'
+    return b'Content-Type: ' + content_type + CRLF
 
 # Generate Last-Modified header given a valid uri
 def generate_last_modified(valid_uri: str):
     time_since_epoch = os.path.getmtime(valid_uri)
     last_m_time = time.strftime("%a, %d %b %Y %I:%M:%S GMT", time.localtime(time_since_epoch))
     time_bytes = last_m_time.encode('ascii')
-    return b'Last-Modified: ' + time_bytes + b'\r\n'
+    return b'Last-Modified: ' + time_bytes + CRLF
 
 # Generate Server header
 def generate_server() -> bytes:
-    return b'Server: calebsserver' + b'\r\n'
+    return b'Server: calebsserver' + CRLF
     
 # Generate Allow header
 def generate_allow() -> bytes:
@@ -140,7 +143,7 @@ def generate_allow() -> bytes:
 
 # Generate status code
 def generate_status_code(status_code: int) -> bytes:
-    return b'HTTP/1.1 ' + status_codes[str(status_code)] + b'\r\n'
+    return b'HTTP/1.1 ' + status_codes[str(status_code)] + CRLF
 
 # Generate generic response headers not associated with content
 def generate_error_response(status: int) -> bytes:
@@ -148,7 +151,7 @@ def generate_error_response(status: int) -> bytes:
     full_response += generate_status_code(status)
     full_response += generate_date_header()
     full_response += generate_server()
-    full_response += b'Connection: close' + b'\r\n'
+    full_response += b'Connection: close' + CRLF
     return full_response
 
 # Generate respones headers associated with found content
@@ -208,13 +211,11 @@ def main(argv):
                     break
             data = data.decode('unicode_escape').encode("raw_unicode_escape")
             if validate_request(data):
-                request_line = data.split(b'\r\n')[0]
+                request_line = data.split(CRLF)[0]
                 info = get_request_info(data)
                 method = info[0][0]
-                uri = info[0][1]
+                uri = urllib.parse.unquote(info[0][1])
                 version = info[0][2]
-                print(method)
-                print(uri)
 
                 # Handle TRACE execution
                 if method == "TRACE":
@@ -227,24 +228,24 @@ def main(argv):
 
                 # Return error responses if appropriate
                 if not check_method(method):
-                    conn.send(generate_error_response(501) + b'\r\n')
+                    conn.send(generate_error_response(501) + CRLF)
                     write_to_log(addr[0], request_line, 501, uri)
                     conn.close()
                     break
                 if not check_version(version):
-                    conn.send(generate_error_response(505) + b'\r\n')
+                    conn.send(generate_error_response(505) + CRLF)
                     write_to_log(addr[0], request_line, 505, uri)
                     conn.close()
                     break
                 if uri == "./var/www/.well-known/access.log":
                     conn.send(generate_status_code(200))
-                    conn.send(generate_success_response_headers('./access.log') + b'\r\n')
-                    conn.send(b'\r\n' + generate_text_payload('./access.log'))
+                    conn.send(generate_success_response_headers('./access.log') + CRLF)
+                    conn.send(CRLF + generate_text_payload('./access.log'))
                     write_to_log(addr[0], request_line, 200, './access.log')
                     conn.close()
                     break
                 if not check_resource(uri):
-                    conn.send(generate_error_response(404) + b'\r\n')
+                    conn.send(generate_error_response(404) + CRLF)
                     conn.send(uri.encode('ascii'))
                     write_to_log(addr[0], request_line, 404, uri)
                     conn.close()
@@ -253,22 +254,22 @@ def main(argv):
                 # Handle OPTIONS execution
                 if method == "OPTIONS":
                     conn.send(generate_error_response(200))
-                    conn.send(generate_allow() + b'\r\n')
+                    conn.send(generate_allow() + CRLF)
                     write_to_log(addr[0], request_line, 200, uri)
                 # Handle HEAD execution
                 elif method == "HEAD":
                     conn.send(generate_status_code(200))
-                    conn.send(generate_success_response_headers(uri) + b'\r\n')
+                    conn.send(generate_success_response_headers(uri) + CRLF)
                     write_to_log(addr[0], request_line, 200, uri)
                 # Handle GET execution
                 elif method == "GET":
                     conn.send(generate_status_code(200))
-                    conn.send(generate_success_response_headers(uri) + b'\r\n')
+                    conn.send(generate_success_response_headers(uri) + CRLF)
                     if b'text' in generate_content_type(uri):
-                        conn.send(b'\r\n' + generate_text_payload(uri))
+                        conn.send(CRLF + generate_text_payload(uri))
                     write_to_log(addr[0], request_line, 200, uri)
             else:
-                conn.send(generate_error_response(400) + b'\r\n')
+                conn.send(generate_error_response(400) + CRLF)
             conn.close()
             break
 
