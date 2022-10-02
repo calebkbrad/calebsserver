@@ -39,6 +39,10 @@ mime_types = {
     ".log": b'text/plain'
 }
 
+virtual_uris = {
+    WEBROOT + "/.well-known/access.log": "./access.log"
+}
+
 # Validate whether a request is valid
 def validate_request(http_request: bytes) -> bool:
     separate_lines = http_request.split(CRLF)
@@ -230,7 +234,6 @@ def main(argv):
                     write_to_log(addr[0], request_line, 200, uri)
                     conn.close()
                     break
-
                 # Return error responses if appropriate
                 if not check_method(method):
                     conn.send(generate_error_response(501) + CRLF)
@@ -242,11 +245,11 @@ def main(argv):
                     write_to_log(addr[0], request_line, 505, uri)
                     conn.close()
                     break
-                if uri == "./var/www/.well-known/access.log":
+                if uri in virtual_uris.keys():
                     conn.send(generate_status_code(200))
-                    conn.send(generate_success_response_headers('./access.log') + CRLF)
-                    conn.send(CRLF + generate_text_payload('./access.log'))
-                    write_to_log(addr[0], request_line, 200, './access.log')
+                    conn.send(generate_success_response_headers(virtual_uris[uri]) + CRLF)
+                    conn.send(CRLF + generate_payload(virtual_uris[uri]))
+                    write_to_log(addr[0], request_line, 200, virtual_uris[uri])
                     conn.close()
                     break
                 if not check_resource(uri):
@@ -273,7 +276,6 @@ def main(argv):
                     mime_type = generate_content_type(uri)
                     conn.send(generate_payload(uri))
                         
-
                     write_to_log(addr[0], request_line, 200, uri)
             else:
                 conn.send(generate_error_response(400) + CRLF)
