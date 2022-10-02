@@ -1,9 +1,20 @@
 FROM    python:3
 LABEL   maintainer = "Caleb Bradford <@calebkbradford>"
 
-COPY    echo_server.py /app/
+ENV WEBROOT="/var/www"
+
+WORKDIR ${WEBROOT}
+RUN     wget https://raw.githubusercontent.com/ibnesayeed/webserver-tester/master/sample/cs531-test-files.tar.gz \
+        && tar xvzf cs531-test-files.tar.gz \
+        && rm -rf cs531-test-files.tar.gz
+
 WORKDIR /app
 
-RUN     chmod a+x echo_server.py
+COPY    src/server.py /app
+COPY    settings /app/settings
+COPY    access.log /app
 
-ENTRYPOINT [ "./echo_server.py" ]
+RUN     chmod a+x server.py
+RUN     pip install pyyaml
+
+ENTRYPOINT [ "./server.py" ]
