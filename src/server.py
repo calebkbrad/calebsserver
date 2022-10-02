@@ -272,7 +272,7 @@ def main(argv):
                         write_to_log(addr[0], request_line, 200, uri)
                     # Handle GET execution
                     elif method == "GET":
-                        conn.send(generate_status_code(206))
+                        conn.send(generate_status_code(200))
                         conn.send(generate_success_response_headers(uri) + CRLF)
                         mime_type = generate_content_type(uri)
                         conn.send(generate_payload(uri))
