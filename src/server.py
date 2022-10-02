@@ -185,7 +185,7 @@ def generate_payload(valid_uri: str) -> bytes:
 
 def write_to_log(addr: str, request: bytes, status: int, uri: str):
     log_entry = b''
-    log_entry += addr.encode('ascii') + b' '
+    log_entry += addr.encode('ascii') + b' - - '
     log_entry += time.strftime("[%d/%b/%Y:%H:%M:%S %z", time.gmtime()).encode('ascii') + b'] '
     log_entry += b'"' + request + b'" '
     log_entry += str(status).encode('ascii') + b' '
