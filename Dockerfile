@@ -12,7 +12,7 @@ WORKDIR /app
 
 COPY    src/server.py /app
 COPY    settings /app/settings
-COPY    access.log /app
+RUN     touch /app/access.log
 
 RUN     chmod a+x server.py
 RUN     pip install pyyaml
