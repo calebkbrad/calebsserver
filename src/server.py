@@ -13,13 +13,19 @@ CRLF = b'\r\n'
 
 config = yaml.safe_load(open("./settings/config.yml"))
 WEBROOT = config["WEBROOT"]
+TIMEOUT = config["TIMEOUT"]
 
 # Dictionary of status codes
 status_codes = {
     "200": b"200 OK",
+    "301": b"301 Moved Permanently",
+    "302": b"302 Found",
+    "304": b"304 Not Modified",
     "400": b"400 Bad Request",
     "403": b"403 Forbidden",
     "404": b"404 Not Found",
+    "408": b"408 Request Timeout",
+    "412": b"412 Precondition Failed",
     "500": b"500 Internal Server Error",
     "501": b"501 Not Implemented",
     "505": b"505 HTTP Version not Supported"
@@ -213,6 +219,7 @@ def main(argv):
         while True:
             try:
                 conn, addr = s.accept()
+                conn.settimeout(float(TIMEOUT))
                 print(f"Connected to {addr}")
                 while True:
                     data_frag = conn.recv(1024)
@@ -282,9 +289,11 @@ def main(argv):
                     conn.send(generate_error_response(400) + CRLF)
                 conn.close()
                 break
-            except:
+            except Exception as e:
+                print(str(e))
                 conn.send(generate_error_response(500) + CRLF)
                 conn.close()
+                break
 
 
     # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
