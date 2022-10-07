@@ -289,6 +289,10 @@ def main(argv):
                     conn.send(generate_error_response(400) + CRLF)
                 conn.close()
                 break
+            except socket.timeout:
+                conn.send(generate_error_response(408))
+                conn.close()
+                break
             except Exception as e:
                 print(str(e))
                 conn.send(generate_error_response(500) + CRLF)
