@@ -64,6 +64,8 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
         print('Fails 4 check')
         return ()
     method = request_line_elements[0]
+    if 'cs531-cs_cbrad022' in request_line_elements[1]:
+        request_line_elements[1] = request_line_elements[1].split("cs531-cs_cbrad022",1)[1]
     uri = WEBROOT + request_line_elements[1]
     http_version = request_line_elements[2]
     if not(method.isupper() and method.isalpha()):
@@ -259,7 +261,6 @@ def main(argv):
     s.listen()
     print(f"Listening on {HOST}:{PORT} for HTTP connections")
     while True:
-        data = B""
         keep_alive = False
         while True:
             try:
