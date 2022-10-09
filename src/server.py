@@ -71,7 +71,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     if not(method.isupper() and method.isalpha()):
         print('Fails 5 check')
         return ()
-    if not(uri == "*" or re.match(r"\./[A-Za-z\./]*", uri) or 'cs531-cs_cbrad022' in uri):
+    if not(uri == "*" or re.match(r"\.*/[A-Za-z\./]*", uri) or 'cs531-cs_cbrad022' in uri):
         print('Fails 6 check')
         print(uri)
         return ()
