@@ -49,6 +49,46 @@ virtual_uris = {
     WEBROOT + "/.well-known/access.log": "./access.log"
 }
 
+def validate_and_get_request_info(http_request: bytes) -> tuple:
+    separated_request = http_request.split(CRLF + CRLF)
+    request_and_headers = separated_request[0]
+    payload = separated_request[1]
+    if payload[-2:] == b'\r\n':
+        payload = payload[:-2]
+    separated_request_headers = request_and_headers.split(CRLF)
+    request = separated_request_headers[0].decode('utf-8')
+    headers = separated_request_headers[1:]
+    
+    request_line_elements = request.split(' ')
+    if len(request_line_elements) != 3:
+        print('Fails 4 check')
+        return ()
+    method = request_line_elements[0]
+    uri = WEBROOT + request_line_elements[1]
+    http_version = request_line_elements[2]
+    if not(method.isupper() and method.isalpha()):
+        print('Fails 5 check')
+        return ()
+    if not(uri == "*" or re.match(r"\./[A-Za-z\./]*", uri) or 'cs531-cs_cbrad022' in uri):
+        print('Fails 6 check')
+        print(uri)
+        return ()
+    if not bool(re.match(r'HTTP/\d\.\d', http_version)):
+        return ()
+    
+    # Ensure Host header is included exactly once
+    if sum(1 for header in headers if b'Host: ' in header) != 1:
+        print('Fails 2 check')
+        return ()
+    
+    keep_alive = True
+    if b'Connection: close' in headers:
+        keep_alive = False
+    
+    return (method, uri, http_version, headers, payload, keep_alive)
+        
+    
+
 # Validate whether a request is valid
 def validate_request(http_request: bytes) -> bool:
     separate_lines = http_request.split(CRLF)
@@ -216,6 +256,7 @@ def main(argv):
     print(f"Listening on {HOST}:{PORT} for HTTP connections")
     while True:
         data = B""
+        keep_alive = True
         while True:
             try:
                 conn, addr = s.accept()
@@ -226,65 +267,67 @@ def main(argv):
                     data += data_frag
                     if len(data_frag) < 1024:   
                         break
-                data = data.decode('unicode_escape').encode("raw_unicode_escape")
-                if validate_request(data):
-                    request_line = data.split(CRLF)[0]
-                    info = get_request_info(data)
-                    method = info[0][0]
-                    uri = urllib.parse.unquote(info[0][1])
-                    version = info[0][2]
 
-                    # Handle TRACE execution
-                    if method == "TRACE":
-                        conn.send(generate_error_response(200))
-                        conn.send(b'Content-Type: message/http\r\n\r\n')
-                        conn.send(data)
-                        write_to_log(addr[0], request_line, 200, uri)
-                        conn.close()
-                        break
-                    # Return error responses if appropriate
-                    if not check_method(method):
-                        conn.send(generate_error_response(501) + CRLF)
-                        write_to_log(addr[0], request_line, 501, uri)
-                        conn.close()
-                        break
-                    if not check_version(version):
-                        conn.send(generate_error_response(505) + CRLF)
-                        write_to_log(addr[0], request_line, 505, uri)
-                        conn.close()
-                        break
-                    if uri in virtual_uris.keys():
-                        conn.send(generate_status_code(200))
-                        conn.send(generate_success_response_headers(virtual_uris[uri]) + CRLF)
-                        conn.send(CRLF + generate_payload(virtual_uris[uri]))
-                        write_to_log(addr[0], request_line, 200, virtual_uris[uri])
-                        conn.close()
-                        break
-                    if not check_resource(uri):
-                        conn.send(generate_error_response(404) + CRLF)
-                        conn.send(uri.encode('ascii'))
-                        write_to_log(addr[0], request_line, 404, uri)
-                        conn.close()
-                        break
-                    
-                    # Handle OPTIONS execution
-                    if method == "OPTIONS":
-                        conn.send(generate_error_response(200))
-                        conn.send(generate_allow() + CRLF)
-                        write_to_log(addr[0], request_line, 200, uri)
-                    # Handle HEAD execution
-                    elif method == "HEAD":
-                        conn.send(generate_status_code(200))
-                        conn.send(generate_success_response_headers(uri) + CRLF)
-                        write_to_log(addr[0], request_line, 200, uri)
-                    # Handle GET execution
-                    elif method == "GET":
-                        conn.send(generate_status_code(200))
-                        conn.send(generate_success_response_headers(uri) + CRLF)
-                        mime_type = generate_content_type(uri)
-                        conn.send(generate_payload(uri))
-                            
-                        write_to_log(addr[0], request_line, 200, uri)
+                data = data.decode('unicode_escape').encode("raw_unicode_escape")
+                try:
+                    method, uri, version, headers, payload, keep_alive = validate_and_get_request_info(data)
+                except ValueError:
+                    conn.send(generate_error_response(400))
+                    conn.close()
+                    break
+
+                request_line = data.split(CRLF)[0]
+                # Handle TRACE execution
+                if method == "TRACE":
+                    conn.send(generate_error_response(200))
+                    conn.send(b'Content-Type: message/http\r\n\r\n')
+                    conn.send(data)
+                    write_to_log(addr[0], request_line, 200, uri)
+                    conn.close()
+                    break
+                # Return error responses if appropriate
+                if not check_method(method):
+                    conn.send(generate_error_response(501) + CRLF)
+                    write_to_log(addr[0], request_line, 501, uri)
+                    conn.close()
+                    break
+                if not check_version(version):
+                    conn.send(generate_error_response(505) + CRLF)
+                    write_to_log(addr[0], request_line, 505, uri)
+                    conn.close()
+                    break
+                if uri in virtual_uris.keys():
+                    conn.send(generate_status_code(200))
+                    conn.send(generate_success_response_headers(virtual_uris[uri]) + CRLF)
+                    conn.send(CRLF + generate_payload(virtual_uris[uri]))
+                    write_to_log(addr[0], request_line, 200, virtual_uris[uri])
+                    conn.close()
+                    break
+                if not check_resource(uri):
+                    conn.send(generate_error_response(404) + CRLF)
+                    conn.send(uri.encode('ascii'))
+                    write_to_log(addr[0], request_line, 404, uri)
+                    conn.close()
+                    break
+                
+                # Handle OPTIONS execution
+                if method == "OPTIONS":
+                    conn.send(generate_error_response(200))
+                    conn.send(generate_allow() + CRLF)
+                    write_to_log(addr[0], request_line, 200, uri)
+                # Handle HEAD execution
+                elif method == "HEAD":
+                    conn.send(generate_status_code(200))
+                    conn.send(generate_success_response_headers(uri) + CRLF)
+                    write_to_log(addr[0], request_line, 200, uri)
+                # Handle GET execution
+                elif method == "GET":
+                    conn.send(generate_status_code(200))
+                    conn.send(generate_success_response_headers(uri) + CRLF)
+                    mime_type = generate_content_type(uri)
+                    conn.send(generate_payload(uri))
+                        
+                    write_to_log(addr[0], request_line, 200, uri)
                 else:
                     conn.send(generate_error_response(400) + CRLF)
                 conn.close()
@@ -292,15 +335,18 @@ def main(argv):
             except socket.timeout:
                 conn.send(generate_error_response(408))
                 conn.close()
+                write_to_log(addr[0], b"", 408, b"")
                 break
             except Exception as e:
                 print(str(e))
                 conn.send(generate_error_response(500) + CRLF)
+                write_to_log(addr[0], request_line, 500, uri)
                 conn.close()
                 break
 
 
     # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\n
     # GET /.well-known/access.log HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
 if __name__ == "__main__":
     main(sys.argv[1:])
