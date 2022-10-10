@@ -7,7 +7,7 @@ import time
 from os.path import exists
 import os
 import yaml
-import urllib.parse
+from urllib.parse import unquote
 
 CRLF = b'\r\n'
 
@@ -66,7 +66,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     method = request_line_elements[0]
     if 'cs531-cs_cbrad022' in request_line_elements[1]:
         request_line_elements[1] = request_line_elements[1].split("cs531-cs_cbrad022",1)[1]
-    uri = WEBROOT + request_line_elements[1]
+    uri = unquote(WEBROOT + request_line_elements[1])
     http_version = request_line_elements[2]
     if not(method.isupper() and method.isalpha()):
         print('Fails 5 check')
@@ -84,8 +84,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
         return ()
     
     keep_alive = True
-    print(headers)
-    print(payload)
+    
     if b'Connection: close' in headers:
         keep_alive = False
     else:
@@ -280,7 +279,7 @@ def main(argv):
                     method, uri, version, headers, payload, keep_alive = validate_and_get_request_info(data)
                     print(keep_alive)
                 except ValueError:
-                    conn.send(generate_error_response(400))
+                    conn.send(generate_error_response(400) + CRLF)
                     conn.close()
                     break
 
@@ -341,8 +340,6 @@ def main(argv):
                     conn.send(generate_payload(uri))
                         
                     write_to_log(addr[0], request_line, 200, uri)
-                else:
-                    conn.send(generate_error_response(400) + CRLF)
                 if not keep_alive:
                         conn.close()
                         break
