@@ -5,6 +5,7 @@ import sys
 import re
 import time
 from os.path import exists, isdir
+from os import listdir
 import os
 import yaml
 from urllib.parse import unquote
@@ -175,8 +176,19 @@ def generate_redirect_headers(redirect_uri: str, status_code: int):
 def check_resource(uri: str) -> bool:
     return exists(uri)
 
-# def generate_directory_listing(directory_uri: str):
-
+def generate_directory_listing(directory_uri: str) -> bytes:
+    list_table_elements = []
+    for f in listdir(directory_uri):
+        file_uri = directory_uri + f
+        time_since_epoch = os.path.getmtime(file_uri)
+        last_m_time = time.strftime("%a, %d %b %Y %I:%M:%S GMT", time.localtime(time_since_epoch))
+        file_size = str(os.path.getsize(file_uri))
+        table_row = f"<tr><td>{f}</td><td>{last_m_time}</td><td>{file_size}</td></tr>"
+        list_table_elements.append(table_row)
+    table_elements = "".join(list_table_elements)
+    table = f"<html><table><tr><th>Name</th><th>Last Modified</th><th>Size</th></tr>{table_elements}</table></html>"
+    
+    return table.encode('ascii') + CRLF
 
 def generate_payload(valid_uri: str) -> bytes:
     with open(valid_uri, 'rb') as f:
@@ -307,16 +319,15 @@ def main(argv):
                     # Handle GET execution
                     elif method == "GET":
                         if isdir(uri):
-                            if uri[-1] != '/':
-                                conn.send(generate_redirect_headers(uri + '/', 301))
-                                if not keep_alive:
-                                    conn.close()
-                                    break
-                            elif exists(uri + DEFAULTRESOURCE):
+                            if exists(uri + DEFAULTRESOURCE):
                                 uri = uri + DEFAULTRESOURCE
                                 conn.send(generate_status_code(200))
                                 conn.send(generate_success_response_headers(uri) + CRLF)
                                 conn.send(generate_payload(uri))
+                            else:
+                                conn.send(generate_status_code(200))
+                                conn.send(generate_success_response_headers(uri) + CRLF)
+                                conn.send(generate_directory_listing(uri))
                         else:
                             conn.send(generate_status_code(200))
                             conn.send(generate_success_response_headers(uri) + CRLF)
@@ -343,7 +354,7 @@ def main(argv):
 
     # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /indx.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\n
-    # GET /test/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # GET /test2/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /.well-known/access.log HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
