@@ -255,6 +255,7 @@ def main(argv):
                         if not keep_alive:
                             conn.close()
                             break
+                        continue
                     # Return error responses if appropriate
                     if not check_method(method):
                         conn.send(generate_error_response(501) + CRLF)
@@ -262,12 +263,14 @@ def main(argv):
                         if not keep_alive:
                             conn.close()
                             break
+                        continue
                     if not check_version(version):
                         conn.send(generate_error_response(505) + CRLF)
                         write_to_log(addr[0], request_line, 505, uri)
                         if not keep_alive:
                             conn.close()
                             break
+                        continue
                     if uri in virtual_uris.keys():
                         conn.send(generate_status_code(200))
                         conn.send(generate_success_response_headers(virtual_uris[uri]) + CRLF)
@@ -276,6 +279,7 @@ def main(argv):
                         if not keep_alive:
                             conn.close()
                             break
+                        continue
                     if not check_resource(uri):
                         conn.send(generate_error_response(404) + CRLF)
                         conn.send(uri.encode('ascii'))
@@ -283,7 +287,13 @@ def main(argv):
                         if not keep_alive:
                             conn.close()
                             break
-                    
+                        continue
+                    if isdir(uri) and uri[-1] != '/':
+                        conn.send(generate_redirect_headers(uri + '/', 301))
+                        if not keep_alive:
+                            conn.close()
+                            break
+                        continue
                     # Handle OPTIONS execution
                     if method == "OPTIONS":
                         conn.send(generate_error_response(200))
@@ -332,7 +342,7 @@ def main(argv):
 
 
     # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
-    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # GET /indx.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\n
     # GET /test/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
