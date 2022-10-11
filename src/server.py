@@ -4,7 +4,7 @@ import socket
 import sys
 import re
 import time
-from os.path import exists
+from os.path import exists, isdir
 import os
 import yaml
 from urllib.parse import unquote
@@ -156,6 +156,20 @@ def generate_success_response_headers(uri: str) -> bytes:
     headers += generate_content_length(uri)
     return headers
 
+# Generate location header given the proper uri for a redirect
+def generate_location(redirect_uri: str) -> bytes:
+    return b'Location: ' + redirect_uri.encode('ascii') + CRLF
+
+# Generate all response headers associated with a redirect status
+def generate_redirect_headers(redirect_uri: str, status_code: int):
+    real_uri = redirect_uri.split(WEBROOT)[1]
+    headers = b''
+    headers += generate_status_code(status_code)
+    headers += generate_date_header()
+    headers += generate_server()
+    headers += generate_location(real_uri)
+    return headers
+
 # Check if a resource exists, given a normalized uri (relative path)
 def check_resource(uri: str) -> bool:
     return exists(uri)
@@ -278,6 +292,12 @@ def main(argv):
                         write_to_log(addr[0], request_line, 200, uri)
                     # Handle GET execution
                     elif method == "GET":
+                        if isdir(uri):
+                            if uri[-1] != '/':
+                                conn.send(generate_redirect_headers(uri + '/', 301))
+                                if not keep_alive:
+                                    conn.close()
+                                    break
                         conn.send(generate_status_code(200))
                         conn.send(generate_success_response_headers(uri) + CRLF)
                         mime_type = generate_content_type(uri)
@@ -303,6 +323,7 @@ def main(argv):
 
     # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # GET /test HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /.well-known/access.log HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
