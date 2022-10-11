@@ -15,6 +15,7 @@ CRLFCRLF = b'\r\n\r\n'
 config = yaml.safe_load(open("./settings/config.yml"))
 WEBROOT = config["WEBROOT"]
 TIMEOUT = config["TIMEOUT"]
+DEFAULTRESOURCE = config["DEFAULTRESOURCE"]
 
 # Dictionary of status codes
 status_codes = {
@@ -174,6 +175,9 @@ def generate_redirect_headers(redirect_uri: str, status_code: int):
 def check_resource(uri: str) -> bool:
     return exists(uri)
 
+# def generate_directory_listing(directory_uri: str):
+
+
 def generate_payload(valid_uri: str) -> bytes:
     with open(valid_uri, 'rb') as f:
         file_contents = b''
@@ -298,10 +302,16 @@ def main(argv):
                                 if not keep_alive:
                                     conn.close()
                                     break
-                        conn.send(generate_status_code(200))
-                        conn.send(generate_success_response_headers(uri) + CRLF)
-                        mime_type = generate_content_type(uri)
-                        conn.send(generate_payload(uri))
+                            elif exists(uri + DEFAULTRESOURCE):
+                                uri = uri + DEFAULTRESOURCE
+                                conn.send(generate_status_code(200))
+                                conn.send(generate_success_response_headers(uri) + CRLF)
+                                conn.send(generate_payload(uri))
+                        else:
+                            conn.send(generate_status_code(200))
+                            conn.send(generate_success_response_headers(uri) + CRLF)
+                            mime_type = generate_content_type(uri)
+                            conn.send(generate_payload(uri))
                             
                         write_to_log(addr[0], request_line, 200, uri)
                     if not keep_alive:
@@ -323,7 +333,7 @@ def main(argv):
 
     # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
-    # GET /test HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # GET /test/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /.well-known/access.log HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
