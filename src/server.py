@@ -391,6 +391,7 @@ def main(argv):
                 break
             except Exception as e:
                 print(str(e))
+                sys.stderr.write(str(e))
                 conn.send(generate_error_response(500) + CRLF)
                 write_to_log(addr[0], request_line, 500, uri)
                 conn.close()
