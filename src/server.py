@@ -199,6 +199,17 @@ def generate_directory_listing(directory_uri: str) -> bytes:
     
     return table.encode('ascii') + CRLF
 
+def generate_directory_response(directory_uri: str) -> bytes:
+    response = b''
+    response += generate_status_code(200)
+    response += generate_date_header()
+    response += generate_server()
+    response += b'Content-Type: text/html'
+    response += generate_last_modified(uri)
+    response += generate_content_length(uri)
+    return response + CRLF
+
+
 def generate_payload(valid_uri: str) -> bytes:
     with open(valid_uri, 'rb') as f:
         file_contents = b''
@@ -343,9 +354,7 @@ def main(argv):
                                 conn.send(generate_success_response_headers(uri) + CRLF)
                                 conn.send(generate_payload(uri))
                             else:
-                                conn.send(generate_status_code(200))
-                                conn.send(generate_success_response_headers(uri) + CRLF)
-                                conn.send(generate_directory_listing(uri))
+                                conn.send(generate_directory_response(uri))
                         else:
                             conn.send(generate_status_code(200))
                             conn.send(generate_success_response_headers(uri) + CRLF)
