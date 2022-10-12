@@ -9,6 +9,7 @@ from os import listdir
 import os
 import yaml
 import string
+import hashlib
 from urllib.parse import unquote
 
 CRLF = b'\r\n'
@@ -136,6 +137,13 @@ def generate_last_modified(valid_uri: str):
     time_bytes = last_m_time.encode('ascii')
     return b'Last-Modified: ' + time_bytes + CRLF
 
+def generate_etag(valid_uri: str) -> bytes:
+    hash_md5 = hashlib.md5()
+    with open(valid_uri, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return b'ETag: ' + hash_md5.hexdigest().encode('ascii')
+
 # Generate Server header
 def generate_server() -> bytes:
     return b'Server: calebsserver' + CRLF
@@ -165,6 +173,7 @@ def generate_success_response_headers(uri: str) -> bytes:
     headers += generate_content_type(uri)
     headers += generate_last_modified(uri)
     headers += generate_content_length(uri)
+    headers += generate_etag(uri)
     return headers
 
 # Generate location header given the proper uri for a redirect
