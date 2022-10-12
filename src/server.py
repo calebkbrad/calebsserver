@@ -376,7 +376,7 @@ def main(argv):
                         conn.close()
                         break
             except socket.timeout:
-                conn.send(generate_error_response(408))
+                conn.send(generate_error_response(408) + CRLF)
                 conn.close()
                 write_to_log(addr[0], b"", 408, b"")
                 break
