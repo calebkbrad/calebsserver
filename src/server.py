@@ -142,7 +142,7 @@ def generate_etag(valid_uri: str) -> bytes:
     with open(valid_uri, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
-    return b'ETag: ' + hash_md5.hexdigest().encode('ascii')
+    return b'ETag: ' + hash_md5.hexdigest().encode('ascii') + CRLF
 
 # Generate Server header
 def generate_server() -> bytes:
