@@ -336,7 +336,9 @@ def main(argv):
                     for redirect in redirects:
                         match_object = re.match(redirect[1], test_uri)
                         if match_object:
+                            conn.send(b'in if')
                             redirect_uri = re.sub(redirect[1], redirect[2], test_uri)
+                            conn.send(b'after sub')
                             conn.send(generate_redirect_headers(redirect_uri, redirect[0]))
                             test_uri = ''
                             break
