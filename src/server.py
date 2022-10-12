@@ -340,6 +340,7 @@ def main(argv):
                             redirect_uri = re.sub(redirect[1], redirect[2], test_uri)
                             conn.send(b'after sub')
                             conn.send(generate_redirect_headers(redirect_uri, redirect[0]))
+                            conn.send(b'after sent headers')
                             test_uri = ''
                             break
                     if test_uri == '':
