@@ -394,6 +394,7 @@ def main(argv):
                 sys.stderr.write(str(e))
                 conn.send(generate_error_response(500) + CRLF)
                 write_to_log(addr[0], request_line, 500, uri)
+                conn.send(str(e).encode('ascii'))
                 conn.close()
                 break
 
