@@ -182,7 +182,10 @@ def generate_location(redirect_uri: str) -> bytes:
 
 # Generate all response headers associated with a redirect status
 def generate_redirect_headers(redirect_uri: str, status_code: int):
-    real_uri = redirect_uri.split(WEBROOT)[1]
+    if WEBROOT in redirect_uri:
+        real_uri = redirect_uri.split(WEBROOT)[1]
+    else:
+        real_uri = redirect_uri
     headers = b''
     headers += generate_status_code(status_code)
     headers += generate_date_header()
@@ -336,11 +339,8 @@ def main(argv):
                     for redirect in redirects:
                         match_object = re.match(redirect[1], test_uri)
                         if match_object:
-                            conn.send(b'in if')
                             redirect_uri = re.sub(redirect[1], redirect[2], test_uri)
-                            conn.send(b'after sub')
                             conn.send(generate_redirect_headers(redirect_uri, redirect[0]))
-                            conn.send(b'after sent headers')
                             test_uri = ''
                             break
                     if test_uri == '':
