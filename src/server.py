@@ -330,6 +330,7 @@ def main(argv):
                             redirect_uri = re.sub(redirect[1], redirect[2], test_uri)
                             conn.send(generate_redirect_headers(redirect_uri, redirect[0]))
                             test_uri = ''
+                            break
                     if test_uri == '':
                         if not keep_alive:
                             conn.close()
@@ -376,7 +377,6 @@ def main(argv):
                         break
             except socket.timeout:
                 conn.send(generate_error_response(408))
-                conn.send(b'Connection: close')
                 conn.close()
                 write_to_log(addr[0], b"", 408, b"")
                 break
