@@ -204,9 +204,9 @@ def generate_directory_response(directory_uri: str) -> bytes:
     response += generate_status_code(200)
     response += generate_date_header()
     response += generate_server()
-    response += b'Content-Type: text/html'
-    response += generate_last_modified(uri)
-    response += generate_content_length(uri)
+    response += b'Content-Type: text/html' + CRLF
+    response += generate_last_modified(directory_uri)
+    response += generate_content_length(directory_uri)
     return response + CRLF
 
 
@@ -355,6 +355,7 @@ def main(argv):
                                 conn.send(generate_payload(uri))
                             else:
                                 conn.send(generate_directory_response(uri))
+                                conn.send(generate_directory_listing(uri))
                         else:
                             conn.send(generate_status_code(200))
                             conn.send(generate_success_response_headers(uri) + CRLF)
@@ -385,5 +386,6 @@ def main(argv):
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /.well-known/access.log HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+#     GET http://cs531-cs_cbrad022/a2-test/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
 if __name__ == "__main__":
     main(sys.argv[1:])
