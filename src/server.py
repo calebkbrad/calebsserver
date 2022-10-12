@@ -8,6 +8,7 @@ from os.path import exists, isdir
 from os import listdir
 import os
 import yaml
+import string
 from urllib.parse import unquote
 
 CRLF = b'\r\n'
@@ -17,6 +18,14 @@ config = yaml.safe_load(open("./settings/config.yml"))
 WEBROOT = config["WEBROOT"]
 TIMEOUT = config["TIMEOUT"]
 DEFAULTRESOURCE = config["DEFAULTRESOURCE"]
+REDIRECTFILE = config["REDIRECTS"]
+
+with open(REDIRECTFILE, 'r') as f:
+    redirects = []
+    for line in f.readlines():
+        redirect = line.split()
+        redirect[0] = int(redirect[0][:-1])
+        redirects.append(redirect)
 
 # Dictionary of status codes
 status_codes = {
@@ -169,8 +178,8 @@ def generate_redirect_headers(redirect_uri: str, status_code: int):
     headers += generate_status_code(status_code)
     headers += generate_date_header()
     headers += generate_server()
-    headers += generate_location(real_uri)
-    return headers
+    headers += generate_location(real_uri) 
+    return headers + CRLF
 
 # Check if a resource exists, given a normalized uri (relative path)
 def check_resource(uri: str) -> bool:
@@ -241,14 +250,10 @@ def main(argv):
                     if len(data_frag) < 1024:   
                         break
                 data = data.decode('unicode_escape').encode("raw_unicode_escape")
-                print(data)
                 if b'\r\n\r\n\r\n' in data:
                     data = data[:-2]
-                print(data)
                 requests = data.split(CRLFCRLF)[:-1]
-                print(requests)
-                print(len(requests))
-                print(requests)
+        
                 for request in requests:   
                     try:
                         method, uri, version, headers, keep_alive = validate_and_get_request_info(request)
@@ -300,8 +305,21 @@ def main(argv):
                             conn.close()
                             break
                         continue
+                    # Return redirect response if appropriate
                     if isdir(uri) and uri[-1] != '/':
                         conn.send(generate_redirect_headers(uri + '/', 301))
+                        if not keep_alive:
+                            conn.close()
+                            break
+                        continue
+                    test_uri = uri.split('/var/www')[1]
+                    for redirect in redirects:
+                        match_object = re.match(redirect[1], test_uri)
+                        if match_object:
+                            redirect_uri = re.sub(redirect[1], redirect[2], test_uri)
+                            conn.send(generate_redirect_headers(redirect_uri, redirect[0]))
+                            test_uri = ''
+                    if test_uri == '':
                         if not keep_alive:
                             conn.close()
                             break
