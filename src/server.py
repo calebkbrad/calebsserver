@@ -342,9 +342,17 @@ def main(argv):
                         write_to_log(addr[0], request_line, 200, uri)
                     # Handle HEAD execution
                     elif method == "HEAD":
-                        conn.send(generate_status_code(200))
-                        conn.send(generate_success_response_headers(uri) + CRLF)
-                        write_to_log(addr[0], request_line, 200, uri)
+                        if isdir(uri):
+                            if exists(uri + DEFAULTRESOURCE):
+                                uri = uri + DEFAULTRESOURCE
+                                conn.send(generate_status_code(200))
+                                conn.send(generate_success_response_headers(uri) + CRLF)
+                            else:
+                                conn.send(generate_directory_response(uri))
+                        else:
+                            conn.send(generate_status_code(200))
+                            conn.send(generate_success_response_headers(uri) + CRLF)
+                            write_to_log(addr[0], request_line, 200, uri)
                     # Handle GET execution
                     elif method == "GET":
                         if isdir(uri):
@@ -382,7 +390,7 @@ def main(argv):
 
     # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /indx.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\n
-    # GET /test2/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # HEAD /test2/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /.well-known/access.log HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
