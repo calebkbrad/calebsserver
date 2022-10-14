@@ -95,8 +95,6 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     
     if b'Connection: close' in headers:
         keep_alive = False
-    else:
-        print("keep alive is still true")
     
     return (method, uri, http_version, headers, keep_alive)
 
@@ -107,6 +105,25 @@ def check_method(method: str) -> bool:
 # Check if version 1.1 is being used
 def check_version(http_version: str) -> bool:
     return http_version == "HTTP/1.1"
+
+# Get all conditional headers from list of headers
+def get_conditionals(headers: list) -> list:
+    allowed_conditional_headers = [b'If-Modified-Since: ', b'If-Unmodified-Since: ', b'If-Match', b'If-None-Match']
+    conditionals = {}
+    for header in headers:
+        if b'If-' in header:
+            conditional = header.decode('utf-8')
+            conditional = conditional.split(": ")
+            conditionals.update({conditional[0]: conditional[1]})
+    return conditionals
+
+# Return whether or not an If-Modified-Since header should be respected
+def parse_if_modified_since(valid_uri: str, conditional_time: str) -> bool:
+    parsed_conditional_time = time.strptime(conditional_time, "%a, %d %b %Y %I:%M:%S GMT")
+    last_m_since_epoch = os.path.getmtime(valid_uri)
+    last_m_time = time.localtime(last_m_since_epoch)
+
+    return last_m_time > parsed_conditional_time
 
 # Generate date header with current time
 def generate_date_header() -> bytes:
@@ -328,6 +345,33 @@ def main(argv):
                             conn.close()
                             break
                         continue
+                    conditional_headers = get_conditionals(headers)
+                    already_processed = False
+                    for conditional in conditional_headers.keys():
+                        try:
+                            print(conditional)
+                            if "Modified" in conditional:
+                                if parse_if_modified_since(uri, conditional_headers[conditional]):
+                                    continue
+                                else:
+                                    conn.send(generate_error_response(304))
+                                    already_processed = True
+                                    break
+                            elif "Unmodified" in conditional:
+                                if not parse_if_modified_since(uri, conditional_headers[conditional]):
+                                    continue
+                                else:
+                                    conn.send(generate_error_response(412))
+                                    already_processed = True
+                                    break
+                        except ValueError:
+                            continue
+                    if already_processed:
+                        if not keep_alive:
+                            conn.close()
+                            break
+                        continue
+
                     # Return redirect response if appropriate
                     if isdir(uri) and uri[-1] != '/':
                         conn.send(generate_redirect_headers(uri + '/', 301))
@@ -335,7 +379,7 @@ def main(argv):
                             conn.close()
                             break
                         continue
-                    test_uri = uri.split('/var/www')[1]
+                    test_uri = uri.split(WEBROOT)[1]
                     for redirect in redirects:
                         match_object = re.match(redirect[1], test_uri)
                         if match_object:
@@ -406,7 +450,7 @@ def main(argv):
     # GET /indx.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\n
     # HEAD /test2/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
-    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-Modified-Since:  12 Oct 2022 10:20:37 GMT\r\nConnection: close\r\n\r\n
     # GET /.well-known/access.log HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
 #     GET http://cs531-cs_cbrad022/a2-test/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
 if __name__ == "__main__":
