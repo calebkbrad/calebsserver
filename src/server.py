@@ -106,6 +106,14 @@ def check_method(method: str) -> bool:
 def check_version(http_version: str) -> bool:
     return http_version == "HTTP/1.1"
 
+# Generate an etag using md5
+def generate_etag(valid_uri: str) -> bytes:
+    hash_md5 = hashlib.md5()
+    with open(valid_uri, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return b'ETag: "' + hash_md5.hexdigest().encode('ascii') + b'"' + CRLF
+
 # Get all conditional headers from list of headers
 def get_conditionals(headers: list) -> list:
     allowed_conditional_headers = [b'If-Modified-Since: ', b'If-Unmodified-Since: ', b'If-Match', b'If-None-Match']
@@ -124,6 +132,14 @@ def parse_if_modified_since(valid_uri: str, conditional_time: str) -> bool:
     last_m_time = time.localtime(last_m_since_epoch)
 
     return last_m_time > parsed_conditional_time
+
+def parse_if_match(valid_uri: str, etag: str):
+    uri_etag = generate_etag(valid_uri)[6:-2]
+    etag_bytes = etag.encode('ascii')
+    print(uri_etag)
+    print(etag_bytes)
+    print(uri_etag == etag_bytes)
+    return etag_bytes == uri_etag
 
 # Generate date header with current time
 def generate_date_header() -> bytes:
@@ -153,13 +169,6 @@ def generate_last_modified(valid_uri: str):
     last_m_time = time.strftime("%a, %d %b %Y %I:%M:%S GMT", time.localtime(time_since_epoch))
     time_bytes = last_m_time.encode('ascii')
     return b'Last-Modified: ' + time_bytes + CRLF
-
-def generate_etag(valid_uri: str) -> bytes:
-    hash_md5 = hashlib.md5()
-    with open(valid_uri, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return b'ETag: "' + hash_md5.hexdigest().encode('ascii') + b'"' + CRLF
 
 # Generate Server header
 def generate_server() -> bytes:
@@ -364,6 +373,20 @@ def main(argv):
                                     conn.send(generate_error_response(412))
                                     already_processed = True
                                     break
+                            elif "None" in conditional:
+                                if not parse_if_match(uri, conditional_headers[conditional]):
+                                    continue
+                                else:
+                                    conn.send(generate_error_response(304))
+                                    already_processed = True
+                                    break
+                            elif "Match" in conditional:
+                                if parse_if_match(uri, conditional_headers[conditional]):
+                                    continue
+                                else:
+                                    conn.send(generate_error_response(412))
+                                    already_processed = True
+                                    break
                         except ValueError:
                             continue
                     if already_processed:
@@ -450,7 +473,8 @@ def main(argv):
     # GET /indx.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\n
     # HEAD /test2/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
-    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-Modified-Since:  12 Oct 2022 10:20:37 GMT\r\nConnection: close\r\n\r\n
+    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-Unmodified-Since: Sat, 01 Oct 2022 10:20:37 GMT\r\nConnection: close\r\n\r\n
+    # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-None-Match: "49c11da52d38c0512fb8169340db16f3"\r\nConnection: close\r\n\r\n
     # GET /.well-known/access.log HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
 #     GET http://cs531-cs_cbrad022/a2-test/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
 if __name__ == "__main__":
