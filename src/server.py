@@ -130,10 +130,7 @@ def parse_if_modified_since(valid_uri: str, conditional_time: str) -> bool:
     parsed_conditional_time = time.strptime(conditional_time, "%a, %d %b %Y %I:%M:%S GMT")
     last_m_since_epoch = os.path.getmtime(valid_uri)
     last_m_time = time.localtime(last_m_since_epoch)
-    conn.send(bytes(last_m_time) + b' ')
-    conn.send(bytes(parsed_conditional_time) + b' ')
-
-
+    
     return last_m_time > parsed_conditional_time or last_m_time == parsed_conditional_time
 
 def parse_if_match(valid_uri: str, etag: str):
