@@ -131,14 +131,12 @@ def parse_if_modified_since(valid_uri: str, conditional_time: str) -> bool:
     last_m_since_epoch = os.path.getmtime(valid_uri)
     last_m_time = time.localtime(last_m_since_epoch)
 
-    return last_m_time > parsed_conditional_time
+    return last_m_time >= parsed_conditional_time
 
 def parse_if_match(valid_uri: str, etag: str):
     uri_etag = generate_etag(valid_uri)[6:-2]
     etag_bytes = etag.encode('ascii')
-    print(uri_etag)
-    print(etag_bytes)
-    print(uri_etag == etag_bytes)
+    
     return etag_bytes == uri_etag
 
 # Generate date header with current time
