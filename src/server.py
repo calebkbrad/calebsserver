@@ -131,7 +131,7 @@ def parse_if_modified_since(valid_uri: str, conditional_time: str) -> bool:
     last_m_since_epoch = os.path.getmtime(valid_uri)
     last_m_time = time.localtime(last_m_since_epoch)
 
-    return last_m_time >= parsed_conditional_time
+    return last_m_time > parsed_conditional_time or last_m_time == parsed_conditional_time
 
 def parse_if_match(valid_uri: str, etag: str):
     uri_etag = generate_etag(valid_uri)[6:-2]
