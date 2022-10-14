@@ -363,28 +363,28 @@ def main(argv):
                                 if parse_if_modified_since(uri, conditional_headers[conditional]):
                                     continue
                                 else:
-                                    conn.send(generate_error_response(304))
+                                    conn.send(generate_error_response(304) + CRLF)
                                     already_processed = True
                                     break
                             elif "Unmodified" in conditional:
                                 if not parse_if_modified_since(uri, conditional_headers[conditional]):
                                     continue
                                 else:
-                                    conn.send(generate_error_response(412))
+                                    conn.send(generate_error_response(412) + CRLF)
                                     already_processed = True
                                     break
                             elif "None" in conditional:
                                 if not parse_if_match(uri, conditional_headers[conditional]):
                                     continue
                                 else:
-                                    conn.send(generate_error_response(304))
+                                    conn.send(generate_error_response(304) + CRLF)
                                     already_processed = True
                                     break
                             elif "Match" in conditional:
                                 if parse_if_match(uri, conditional_headers[conditional]):
                                     continue
                                 else:
-                                    conn.send(generate_error_response(412))
+                                    conn.send(generate_error_response(412) + CRLF)
                                     already_processed = True
                                     break
                         except ValueError:
