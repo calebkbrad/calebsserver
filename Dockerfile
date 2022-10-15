@@ -11,6 +11,7 @@ RUN     wget https://raw.githubusercontent.com/ibnesayeed/webserver-tester/maste
 WORKDIR /app
 
 COPY    src/server.py /app
+COPY    errorpages /app
 COPY    settings /app/settings
 RUN     touch /app/access.log
 
