@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import socket
 import sys
 import re
@@ -131,7 +130,7 @@ def parse_if_modified_since(valid_uri: str, conditional_time: str) -> bool:
     last_m_since_epoch = os.path.getmtime(valid_uri)
     last_m_time = time.localtime(last_m_since_epoch)
     
-    return last_m_time > parsed_conditional_time or last_m_time == parsed_conditional_time
+    return last_m_time >= parsed_conditional_time
 
 def parse_if_match(valid_uri: str, etag: str):
     uri_etag = generate_etag(valid_uri)[6:-2]
@@ -180,13 +179,28 @@ def generate_allow() -> bytes:
 def generate_status_code(status_code: int) -> bytes:
     return b'HTTP/1.1 ' + status_codes[str(status_code)] + CRLF
 
+def generate_error_payload(status_code: int) -> bytes:
+    page = f'./errorpages/{str(status_code)}.html'
+    with open(page, 'rb') as f:
+        file_contents = b''
+        byte = b''
+        while True:
+            byte = f.read(1)
+            file_contents += byte
+            if not byte:
+                break
+    return file_contents
+
 # Generate generic response headers not associated with content
 def generate_error_response(status: int) -> bytes:
     full_response = b''
     full_response += generate_status_code(status)
     full_response += generate_date_header()
     full_response += generate_server()
-    full_response += b'Connection: close' + CRLF
+    full_response += b'Connection: close' + CRLFCRLF
+    if status != 200 and status != 304:
+        full_response += b'Content-Type: text/html' + b'\r\n'
+        full_response += generate_error_payload(status)
     return full_response
 
 # Generate respones headers associated with found content
@@ -214,7 +228,8 @@ def generate_redirect_headers(redirect_uri: str, status_code: int):
     headers += generate_status_code(status_code)
     headers += generate_date_header()
     headers += generate_server()
-    headers += generate_location(real_uri) 
+    headers += generate_location(real_uri) + CRLFCRLF
+    headers += generate_error_payload(status_code)
     return headers + CRLF
 
 # Check if a resource exists, given a normalized uri (relative path)
@@ -305,7 +320,8 @@ def main(argv):
                     try:
                         method, uri, version, headers, keep_alive = validate_and_get_request_info(request)
                     except ValueError:
-                        conn.send(generate_error_response(400) + CRLF)
+                        conn.send(generate_error_response(400))
+                        conn.send(generate_error_payload(400))
                         conn.close()
                         break
 
