@@ -99,7 +99,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     for header in headers:
         if b'Range:' in header:
             try:
-                range_string = b'Range:'.split(b': bytes=')[1].decode('utf-8')
+                range_string = header.split(b': bytes=')[1].decode('utf-8')
             except IndexError:
                 print('index error happened')
                 continue
@@ -520,7 +520,7 @@ def main(argv):
                 break
 
 
-    # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: 800-\r\n\r\n
     # GET /indx.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\n
     # HEAD /test2/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
