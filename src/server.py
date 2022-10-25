@@ -95,12 +95,25 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     if b'Connection: close' in headers:
         keep_alive = False
 
-    byte_range = 0
+    byte_range = []
     for header in headers:
         if b'Range:' in header:
-            byte_range = int(b'Range:'.split(b':')[1].encode('ascii'))
+            try:
+                range_string = b'Range:'.split(b': bytes=')[1].decode('utf-8')
+            except IndexError:
+                print('index error happened')
+                continue
+            range_string = range_string.split('-')
+            if len(range_string) > 2:
+                continue
+            for num in range_string:
+                byte_range.append(int(num))
+            break
     
-    return (method, uri, http_version, headers, keep_alive)
+            
+
+    
+    return (method, uri, http_version, headers, keep_alive, byte_range)
 
 # Check if a method is currently supported
 def check_method(method: str) -> bool:
@@ -209,13 +222,17 @@ def generate_error_response(status: int) -> bytes:
     return full_response
 
 # Generate respones headers associated with found content
-def generate_success_response_headers(uri: str) -> bytes:
+def generate_success_response_headers(uri: str, length=0) -> bytes:
     headers = b''
     headers += generate_date_header()
     headers += generate_server()
     headers += generate_content_type(uri)
     headers += generate_last_modified(uri)
-    headers += generate_content_length(uri)
+    if length == 0:
+        headers += generate_content_length(uri)
+    else:
+        length = str(length).encode('ascii')
+        headers += b'Content-Length: ' + length + CRLF
     headers += generate_etag(uri)
     return headers
 
@@ -323,7 +340,7 @@ def main(argv):
         
                 for request in requests:   
                     try:
-                        method, uri, version, headers, keep_alive = validate_and_get_request_info(request)
+                        method, uri, version, headers, keep_alive, byte_range = validate_and_get_request_info(request)
                     except ValueError:
                         conn.send(generate_error_response(400))
                         conn.send(generate_error_payload(400))
@@ -464,10 +481,25 @@ def main(argv):
                                 conn.send(generate_directory_response(uri))
                                 conn.send(generate_directory_listing(uri))
                         else:
-                            conn.send(generate_status_code(200))
-                            conn.send(generate_success_response_headers(uri) + CRLF)
-                            mime_type = generate_content_type(uri)
-                            conn.send(generate_payload(uri))
+                            if not byte_range:
+                                conn.send(generate_status_code(200))
+                                conn.send(generate_success_response_headers(uri) + CRLF)
+                                conn.send(generate_payload(uri))
+                            else:
+                                if len(byte_range == 1):
+                                    content_range = byte_range[0]
+                                    payload = generate_payload(uri)[content_range:]
+                                    length = len(payload)
+                                    conn.send(generate_status_code(206))
+                                    conn.send(generate_success_response_headers(uri, length) + CRLF)
+                                    conn.send(payload)
+                                else:
+                                    content_range_lower, content_range_upper = byte_range
+                                    payload = generate_payload(uri)[content_range_lower:content_range_upper]
+                                    length = len(payload)
+                                    conn.send(generate_status_code(206))
+                                    conn.send(generate_success_response_headers(uri, length) + CRLF)
+                                    conn.send(payload)
                             
                         write_to_log(addr[0], request_line, 200, uri)
                     if not keep_alive:
