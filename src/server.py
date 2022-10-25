@@ -502,7 +502,7 @@ def main(argv):
                                     content_range_lower = str(content_range_lower).encode('ascii')
                                     content_range_upper = str(content_range_upper).encode('ascii')
                                     file_size = os.path.getsize(uri)
-                                    conn.send(b'Content-Range: bytes' + content_range_lower + b'-' + content_range_upper + b'/' + str(file_size).encode('ascii') + CRLF)
+                                    conn.send(b'Content-Range: bytes ' + content_range_lower + b'-' + content_range_upper + b'/' + str(file_size).encode('ascii') + CRLF)
                                     conn.send(generate_success_response_headers(uri, length) + CRLF)
                                     conn.send(payload)
                             
