@@ -215,7 +215,7 @@ def generate_error_response(status: int) -> bytes:
     full_response += generate_status_code(status)
     full_response += generate_date_header()
     full_response += generate_server()
-    full_response += b'Connection: close' + CRLF
+    full_response += b'Connection: close'
     if status != 200 and status != 304:
         full_response += CRLF + b'Content-Type: text/html' + b'\r\n'
         full_response += generate_error_payload(status)
@@ -486,7 +486,7 @@ def main(argv):
                                 conn.send(generate_success_response_headers(uri) + CRLF)
                                 conn.send(generate_payload(uri))
                             else:
-                                if len(byte_range == 1):
+                                if len(byte_range) == 1:
                                     content_range = byte_range[0]
                                     payload = generate_payload(uri)[content_range:]
                                     length = len(payload)
@@ -520,7 +520,7 @@ def main(argv):
                 break
 
 
-    # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: 800-\r\n\r\n
+    # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: bytes=800-\r\n\r\n
     # GET /indx.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\n
     # HEAD /test2/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
