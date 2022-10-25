@@ -232,8 +232,8 @@ def generate_success_response_headers(uri: str, length=0) -> bytes:
     if length == 0:
         headers += generate_content_length(uri)
     else:
-        length = str(length).encode('ascii')
-        headers += b'Content-Length: ' + length + CRLF
+        bytes_length = str(length).encode('ascii')
+        headers += b'Content-Length: ' + bytes_length + CRLF
     headers += generate_etag(uri)
     return headers
 
@@ -499,6 +499,10 @@ def main(argv):
                                     payload = generate_payload(uri)[content_range_lower:content_range_upper]
                                     length = len(payload)
                                     conn.send(generate_status_code(206))
+                                    content_range_lower = str(content_range_lower).encode('ascii')
+                                    content_range_upper = str(content_range_upper).encode('ascii')
+                                    file_size = os.path.getsize(uri)
+                                    conn.send(b'Content-Range: bytes' + content_range_lower + b'-' + content_range_upper + b'/' + str(file_size).encode('ascii') + CRLF)
                                     conn.send(generate_success_response_headers(uri, length) + CRLF)
                                     conn.send(payload)
                             
