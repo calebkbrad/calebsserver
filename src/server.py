@@ -94,6 +94,11 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     
     if b'Connection: close' in headers:
         keep_alive = False
+
+    byte_range = 0
+    for header in headers:
+        if b'Range:' in header:
+            byte_range = int(b'Range:'.split(b':')[1].encode('ascii'))
     
     return (method, uri, http_version, headers, keep_alive)
 
