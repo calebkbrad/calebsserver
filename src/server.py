@@ -496,7 +496,7 @@ def main(argv):
                                     conn.send(payload)
                                 else:
                                     content_range_lower, content_range_upper = byte_range
-                                    payload = generate_payload(uri)[content_range_lower:content_range_upper]
+                                    payload = generate_payload(uri)[content_range_lower:content_range_upper+1]
                                     length = len(payload)
                                     conn.send(generate_status_code(206))
                                     content_range_lower = str(content_range_lower).encode('ascii')
