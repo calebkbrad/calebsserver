@@ -30,6 +30,7 @@ with open(REDIRECTFILE, 'r') as f:
 # Dictionary of status codes
 status_codes = {
     "200": b"200 OK",
+    "206": b'206 Partial Content',
     "301": b"301 Moved Permanently",
     "302": b"302 Found",
     "304": b"304 Not Modified",
@@ -215,9 +216,9 @@ def generate_error_response(status: int) -> bytes:
     full_response += generate_status_code(status)
     full_response += generate_date_header()
     full_response += generate_server()
-    full_response += b'Connection: close'
+    full_response += b'Connection: close' + CRLF
     if status != 200 and status != 304:
-        full_response += CRLF + b'Content-Type: text/html' + b'\r\n'
+        full_response +=  b'Content-Type: text/html' + CRLFCRLF
         full_response += generate_error_payload(status)
     return full_response
 
