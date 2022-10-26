@@ -132,7 +132,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
         elif b'Accept' in header:
             try:
                 key = header.decode('utf-8').split(':')[0]
-                accept_headers.update(key: split_accepts(header))
+                accept_headers.update(key, split_accepts(header))
             except IndexError:
                 print('index error happened')
                 continue
