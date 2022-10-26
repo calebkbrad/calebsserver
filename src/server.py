@@ -62,6 +62,9 @@ virtual_uris = {
     WEBROOT + "/.well-known/access.log": "./access.log"
 }
 
+def split_accepts(accept_header: bytes) -> list:
+
+
 def validate_and_get_request_info(http_request: bytes) -> tuple:
     request_and_headers = http_request.split(CRLF)
     request = request_and_headers[0].decode('utf-8')
@@ -97,6 +100,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
         keep_alive = False
 
     byte_range = []
+    accept_headers = []
     for header in headers:
         if b'Range:' in header:
             try:
@@ -109,7 +113,23 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
                 continue
             for num in range_string:
                 byte_range.append(int(num))
-            break
+            continue
+        elif b'Accept' in header:
+            try:
+                accept_header = header.decode('utf-8')
+                options = accept_header.split(': ')[1]
+                list_options = options.split(', ')
+                for option in list_options:
+                    value_pair = []
+                    attr, qval = option.split('; ')
+                    qval = float(qval.split('q=')[1])
+                    value_pair.append(attr)
+                    value_pair.append(qval)
+                    accept_headers.append(value_pair)
+            except IndexError:
+                print('index error happened')
+                continue
+
     
             
 
