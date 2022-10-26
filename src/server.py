@@ -62,8 +62,23 @@ virtual_uris = {
     WEBROOT + "/.well-known/access.log": "./access.log"
 }
 
-def split_accepts(accept_header: bytes) -> list:
-
+# Given an accept header, split it up into appropriate content describer and q values
+def split_accepts(header: bytes) -> list:
+    accept_header = header.decode('utf-8')
+    options = accept_header.split(':')[1]
+    list_options = options.split(',')
+    accept = []
+    for option in list_options:
+        value_pair = []
+        if ';' not in option:
+            value_pair.append(option)
+        else:
+            attr, qval = option.split(';')
+            qval = float(qval.split('q=')[1])
+            value_pair.append(attr)
+            value_pair.append(qval)
+        accept.append(value_pair)
+    return accept
 
 def validate_and_get_request_info(http_request: bytes) -> tuple:
     request_and_headers = http_request.split(CRLF)
@@ -100,7 +115,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
         keep_alive = False
 
     byte_range = []
-    accept_headers = []
+    accept_headers = {}
     for header in headers:
         if b'Range:' in header:
             try:
@@ -116,19 +131,13 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
             continue
         elif b'Accept' in header:
             try:
-                accept_header = header.decode('utf-8')
-                options = accept_header.split(': ')[1]
-                list_options = options.split(', ')
-                for option in list_options:
-                    value_pair = []
-                    attr, qval = option.split('; ')
-                    qval = float(qval.split('q=')[1])
-                    value_pair.append(attr)
-                    value_pair.append(qval)
-                    accept_headers.append(value_pair)
+                key = header.decode('utf-8').split(':')[0]
+                accept_headers.update(key: split_accepts(header))
             except IndexError:
                 print('index error happened')
                 continue
+
+    print(accept_headers)
 
     
             
@@ -546,7 +555,7 @@ def main(argv):
 
 
     # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: bytes=800-\r\n\r\n
-    # GET /indx.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\n
+    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png\r\n\r\n
     # HEAD /test2/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-Unmodified-Since: Sat, 01 Oct 2022 10:20:37 GMT\r\nConnection: close\r\n\r\n
