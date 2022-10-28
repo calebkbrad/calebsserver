@@ -187,6 +187,12 @@ def parse_if_match(valid_uri: str, etag: str):
     
     return etag_bytes == uri_etag
 
+def parse_accept(uri: str, accept_element: list) -> str:
+    if len(accept_element) == 1:
+        possible_uri = uri + accept_element[0].split('/')
+        if exists(uri + accept_element[0]):
+
+
 # Generate date header with current time
 def generate_date_header() -> bytes:
     current_time = time.strftime("%a, %d %b %Y %I:%M:%S GMT", time.gmtime())
