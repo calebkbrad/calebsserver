@@ -73,6 +73,7 @@ def split_accepts(header: bytes) -> list:
         if ';' not in option:
             value_pair.append(option)
         else:
+            print(option)
             attr, qval = option.split(';')
             qval = float(qval.split('q=')[1])
             value_pair.append(attr)
@@ -132,7 +133,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
         elif b'Accept' in header:
             try:
                 key = header.decode('utf-8').split(':')[0]
-                accept_headers.update(key, split_accepts(header))
+                accept_headers.update({key: split_accepts(header)})
             except IndexError:
                 print('index error happened')
                 continue
@@ -143,7 +144,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
             
 
     
-    return (method, uri, http_version, headers, keep_alive, byte_range)
+    return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers)
 
 # Check if a method is currently supported
 def check_method(method: str) -> bool:
@@ -370,11 +371,12 @@ def main(argv):
         
                 for request in requests:   
                     try:
-                        method, uri, version, headers, keep_alive, byte_range = validate_and_get_request_info(request)
-                    except ValueError:
+                        method, uri, version, headers, keep_alive, byte_range, accept_headers = validate_and_get_request_info(request)
+                    except ValueError as e:
                         conn.send(generate_error_response(400))
                         conn.send(generate_error_payload(400))
                         conn.close()
+                        print(str(e))
                         break
 
                     request_line = data.split(CRLF)[0]
@@ -548,14 +550,14 @@ def main(argv):
                 print(str(e))
                 sys.stderr.write(str(e))
                 conn.send(generate_error_response(500) + CRLF)
-                write_to_log(addr[0], request_line, 500, uri)
+                # write_to_log(addr[0], request_line, 500, uri)
                 conn.send(str(e).encode('ascii'))
                 conn.close()
                 break
 
 
     # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: bytes=800-\r\n\r\n
-    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png\r\n\r\n
+    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
     # HEAD /test2/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-Unmodified-Since: Sat, 01 Oct 2022 10:20:37 GMT\r\nConnection: close\r\n\r\n
