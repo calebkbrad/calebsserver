@@ -139,11 +139,6 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
                 continue
 
     print(accept_headers)
-
-    
-            
-
-    
     return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers)
 
 # Check if a method is currently supported
@@ -188,9 +183,14 @@ def parse_if_match(valid_uri: str, etag: str):
     return etag_bytes == uri_etag
 
 def parse_accept(uri: str, accept_element: list) -> str:
-    if len(accept_element) == 1:
-        possible_uri = uri + accept_element[0].split('/')
-        if exists(uri + accept_element[0]):
+    accept_type = accept_element[0].split('/')[1]
+    directory_uri = uri[:uri.rfind('/')]
+    possible_uris = listdir(directory_uri)
+    if '*' in accept_type:
+        possible_uris
+    if exists(uri + accept_element[0]):
+        pass
+    # if len(accept_element) == 1:
 
 
 # Generate date header with current time
@@ -208,7 +208,7 @@ def generate_content_length(valid_uri: str) -> bytes:
 def generate_content_type(valid_uri: str) -> bytes:
     content_type = b''
     for mime_type in mime_types.keys():
-        if valid_uri.endswith(mime_type):
+        if mime_type in valid_uri:
             content_type += mime_types[mime_type]
     if content_type == b'':
         content_type += b'application/octet-stream'
