@@ -1,6 +1,6 @@
 ADDRESS: 0.0.0.0
 PORT: 80
-WEBROOT: ./var/www
+WEBROOT: /var/www
 TIMEOUT: 5
 DEFAULTRESOURCE: index.html
 REDIRECTS: ./settings/redirects.cfg
