@@ -33,7 +33,8 @@ with open(REDIRECTFILE, 'r') as f:
 with open(LANGUAGES, 'r') as f:
     languages = []
     for line in f.readlines():
-        languages.append(line)
+        languages.append(line.strip())
+print(languages)
 
 # Dictionary of status codes
 status_codes = {
