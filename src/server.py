@@ -19,13 +19,21 @@ WEBROOT = config["WEBROOT"]
 TIMEOUT = config["TIMEOUT"]
 DEFAULTRESOURCE = config["DEFAULTRESOURCE"]
 REDIRECTFILE = config["REDIRECTS"]
+LANGUAGES = config["LANGUAGES"]
 
+# Parse redirect regex config file
 with open(REDIRECTFILE, 'r') as f:
     redirects = []
     for line in f.readlines():
         redirect = line.split()
         redirect[0] = int(redirect[0][:-1])
         redirects.append(redirect)
+
+# Parse content language config file
+with open(LANGUAGES, 'r') as f:
+    languages = []
+    for line in f.readlines():
+        languages.append(line)
 
 # Dictionary of status codes
 status_codes = {
@@ -57,6 +65,7 @@ mime_types = {
     ".doc": b'application/vnd.ms-word',
     ".log": b'text/plain'
 }
+
 
 virtual_uris = {
     WEBROOT + "/.well-known/access.log": "./access.log"
@@ -207,13 +216,22 @@ def generate_content_length(valid_uri: str) -> bytes:
 # Generate Content-Type header given a valid uri
 def generate_content_type(valid_uri: str) -> bytes:
     content_type = b''
+    content_lang = b''
     for mime_type in mime_types.keys():
         if mime_type in valid_uri:
             content_type += mime_types[mime_type]
     if content_type == b'':
         content_type += b'application/octet-stream'
+    else:
+        for lang in languages:
+            if valid_uri.endswith(lang):
+                content_lang = lang
     
-    return b'Content-Type: ' + content_type + CRLF
+    full_headers = b'Content-Type: ' + content_type + CRLF
+    if content_lang:
+        full_headers += b'Content-Language: ' + content_lang + CRLF
+
+    return full_headers
 
 # Generate Last-Modified header given a valid uri
 def generate_last_modified(valid_uri: str):
