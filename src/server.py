@@ -33,7 +33,7 @@ with open(REDIRECTFILE, 'r') as f:
 with open(LANGUAGES, 'r') as f:
     languages = []
     for line in f.readlines():
-        languages.append(line.strip().encode('ascii'))
+        languages.append(line.strip())
 print(languages)
 
 # Dictionary of status codes
@@ -226,7 +226,7 @@ def generate_content_type(valid_uri: str) -> bytes:
     else:
         for lang in languages:
             if valid_uri.endswith(lang):
-                content_lang = lang
+                content_lang = lang.encode('ascii')
     
     full_headers = b'Content-Type: ' + content_type + CRLF
     if content_lang:
