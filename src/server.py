@@ -227,9 +227,9 @@ def generate_content_type(valid_uri: str) -> bytes:
     else:
         for lang in languages:
             if lang in valid_uri:
-                content_lang = lang.encode('ascii')
+                content_lang = lang.encode('ascii')[1:]
         if valid_uri.endswith('.Z'):
-            content_encoding += b'gzip'
+            content_encoding += b'compress'
         
 
 
