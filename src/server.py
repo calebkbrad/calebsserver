@@ -33,7 +33,7 @@ with open(REDIRECTFILE, 'r') as f:
 with open(LANGUAGES, 'r') as f:
     languages = []
     for line in f.readlines():
-        languages.append(line.strip())
+        languages.append('.' + line.strip())
 print(languages)
 
 # Dictionary of status codes
@@ -214,10 +214,11 @@ def generate_content_length(valid_uri: str) -> bytes:
     file_size = os.path.getsize(valid_uri)
     return b'Content-Length: ' + str(file_size).encode('ascii') + CRLF
 
-# Generate Content-Type header given a valid uri
+# Generate Content-Type header given a valid uri. Also generate Content-Language header if necessary
 def generate_content_type(valid_uri: str) -> bytes:
     content_type = b''
     content_lang = b''
+    content_encoding = b''
     for mime_type in mime_types.keys():
         if mime_type in valid_uri:
             content_type += mime_types[mime_type]
@@ -225,12 +226,18 @@ def generate_content_type(valid_uri: str) -> bytes:
         content_type += b'application/octet-stream'
     else:
         for lang in languages:
-            if valid_uri.endswith(lang):
+            if lang in valid_uri:
                 content_lang = lang.encode('ascii')
-    
+        if valid_uri.endswith('.Z'):
+            content_encoding += b'gzip'
+        
+
+
     full_headers = b'Content-Type: ' + content_type + CRLF
     if content_lang:
         full_headers += b'Content-Language: ' + content_lang + CRLF
+    if content_encoding:
+        full_headers += b'Content-Encoding: ' + content_encoding + CRLF
 
     return full_headers
 
