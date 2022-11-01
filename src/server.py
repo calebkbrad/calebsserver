@@ -279,7 +279,6 @@ def generate_error_response(status: int) -> bytes:
     full_response += generate_status_code(status)
     full_response += generate_date_header()
     full_response += generate_server()
-    full_response
     full_response += b'Connection: close' + CRLF
     if status != 200 and status != 304:
         full_response +=  b'Content-Type: text/html' + CRLF
@@ -451,7 +450,6 @@ def main(argv):
                         continue
                     if not check_resource(uri):
                         conn.send(generate_error_response(404) + CRLF)
-                        conn.send(uri.encode('ascii'))
                         write_to_log(addr[0], request_line, 404, uri)
                         if not keep_alive:
                             conn.close()
@@ -463,14 +461,14 @@ def main(argv):
                         try:
                             print(conditional)
                             if "Modified" in conditional:
-                                if parse_if_modified_since(uri, conditional_headers[conditional]):
+                                if not parse_if_modified_since(uri, conditional_headers[conditional]):
                                     continue
                                 else:
                                     conn.send(generate_error_response(304) + CRLF)
                                     already_processed = True
                                     break
                             elif "Unmodified" in conditional:
-                                if not parse_if_modified_since(uri, conditional_headers[conditional]):
+                                if parse_if_modified_since(uri, conditional_headers[conditional]):
                                     continue
                                 else:
                                     conn.send(generate_error_response(412) + CRLF)
