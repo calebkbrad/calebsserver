@@ -20,6 +20,7 @@ TIMEOUT = config["TIMEOUT"]
 DEFAULTRESOURCE = config["DEFAULTRESOURCE"]
 REDIRECTFILE = config["REDIRECTS"]
 LANGUAGES = config["LANGUAGES"]
+CHARSETS = config["CHARSETS"]
 
 # Parse redirect regex config file
 with open(REDIRECTFILE, 'r') as f:
@@ -34,7 +35,12 @@ with open(LANGUAGES, 'r') as f:
     languages = []
     for line in f.readlines():
         languages.append('.' + line.strip())
-print(languages)
+
+with open(CHARSETS, 'r') as f:
+    charsets = {}
+    for line in f.readlines():
+        separate = line.split()
+        charsets.update({separate[0]: separate[1]})
 
 # Dictionary of status codes
 status_codes = {
@@ -214,11 +220,12 @@ def generate_content_length(valid_uri: str) -> bytes:
     file_size = os.path.getsize(valid_uri)
     return b'Content-Length: ' + str(file_size).encode('ascii') + CRLF
 
-# Generate Content-Type header given a valid uri. Also generate Content-Language header if necessary
+# Generate Content-Type header given a valid uri. Also generate Content-Language, Content-Encoding, and Charset-Encoding
 def generate_content_type(valid_uri: str) -> bytes:
     content_type = b''
     content_lang = b''
     content_encoding = b''
+    charset_encoding = b''
     for mime_type in mime_types.keys():
         if mime_type in valid_uri:
             content_type += mime_types[mime_type]
@@ -230,10 +237,14 @@ def generate_content_type(valid_uri: str) -> bytes:
                 content_lang = lang.encode('ascii')[1:]
         if valid_uri.endswith('.Z'):
             content_encoding += b'compress'
-        
+        elif valid_uri.endswith('.gz'):
+            content_encoding += b'gzip'
+        for charset in charsets.keys():
+            if charset in valid_uri:
+                charset_encoding +=b'; charset=' + charsets[charset].encode('ascii')
 
 
-    full_headers = b'Content-Type: ' + content_type + CRLF
+    full_headers = b'Content-Type: ' + content_type + charset_encoding + CRLF
     if content_lang:
         full_headers += b'Content-Language: ' + content_lang + CRLF
     if content_encoding:
@@ -591,7 +602,7 @@ def main(argv):
 
     # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: bytes=800-\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
-    # HEAD /test2/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # HEAD text.html.jis HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-Unmodified-Since: Sat, 01 Oct 2022 10:20:37 GMT\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-None-Match: "49c11da52d38c0512fb8169340db16f3"\r\nConnection: close\r\n\r\n
