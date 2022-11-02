@@ -540,44 +540,44 @@ def main(argv):
                             conn.close()
                             break
                         continue
-                    already_processed = False
-                    potential_reps = check_if_multiple_reps(uri)
-                    if accept_headers and not uri.endswith(".Z") and not uri.endswith(".gzip"):
-                        for accept_header in accept_headers.keys():
-                            if accept_header == "Accept-Encoding":
-                                normalize_accept_encoding(accept_headers[accept_header]) 
-                                print("Accept Headers :" + str(accept_headers[accept_header]))
-                            elif accept_header == "Accept-Charset":
-                                normalize_accept_charset(accept_headers[accept_header])
-                                print("Accept Headers :" + str(accept_headers[accept_header]))
-                            if accept_header != "Accept":
-                                negotiation = parse_other_accepts(accept_headers[accept_header], potential_reps)
-                                if negotiation == "":
-                                    conn.send(generate_error_response(406, method))
-                                    already_processed = True
+                    if not isdir(uri):
+                        already_processed = False
+                        potential_reps = check_if_multiple_reps(uri)
+                        if accept_headers and not uri.endswith(".Z") and not uri.endswith(".gzip"):
+                            for accept_header in accept_headers.keys():
+                                if accept_header == "Accept-Encoding":
+                                    normalize_accept_encoding(accept_headers[accept_header]) 
+                                    print("Accept Headers :" + str(accept_headers[accept_header]))
+                                elif accept_header == "Accept-Charset":
+                                    normalize_accept_charset(accept_headers[accept_header])
+                                    print("Accept Headers :" + str(accept_headers[accept_header]))
+                                if accept_header != "Accept":
+                                    negotiation = parse_other_accepts(accept_headers[accept_header], potential_reps)
+                                    if negotiation == "":
+                                        conn.send(generate_error_response(406, method))
+                                        already_processed = True
+                                        break
+                                    elif negotiation == "multiple":
+                                        conn.send(generate_error_response(300, method, alternates=potential_reps))
+                                        already_processed = True
+                                        break
+                                    else:
+                                        for rep in potential_reps:
+                                            if rep == negotiation:
+                                                directory_uri = uri[:uri.rfind('/')]
+                                                uri = directory_uri + rep
+                            if already_processed:
+                                if not keep_alive:
+                                    conn.close()
                                     break
-                                elif negotiation == "multiple":
-                                    conn.send(generate_error_response(300, method, alternates=potential_reps))
-                                    already_processed = True
-                                    break
-                                else:
-                                    for rep in potential_reps:
-                                        if rep == negotiation:
-                                            directory_uri = uri[:uri.rfind('/')]
-                                            uri = directory_uri + rep
-                        if already_processed:
+                                continue
+                                    
+                        if len(potential_reps) > 1:
+                            conn.send(generate_error_response(300, method, alternates=potential_reps))
                             if not keep_alive:
                                 conn.close()
                                 break
                             continue
-                                
-
-                    if len(potential_reps) > 1:
-                        conn.send(generate_error_response(300, method, alternates=potential_reps))
-                        if not keep_alive:
-                            conn.close()
-                            break
-                        continue
                     if not check_resource(uri):
                         conn.send(generate_error_response(404, method) + CRLF)
                         conn.send(uri.encode('ascii'))
