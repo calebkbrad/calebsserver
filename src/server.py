@@ -365,8 +365,9 @@ def generate_error_response(status: int, method: str, alternates=[]) -> bytes:
     full_response += generate_status_code(status)
     full_response += generate_date_header()
     full_response += generate_server()
-    full_response +=  b'Content-Type: text/html' + CRLF
-    full_response += b'Transfer-Encoding: chunked' + CRLF
+    if status_codes != 200:
+        full_response +=  b'Content-Type: text/html' + CRLF
+        full_response += b'Transfer-Encoding: chunked' + CRLF
     if alternates:
         full_response += generate_alternates_header(alternates)
     full_response += b'Connection: close' + CRLFCRLF
@@ -504,7 +505,7 @@ def main(argv):
                     request_line = data.split(CRLF)[0]
                     # Handle TRACE execution
                     if method == "TRACE":
-                        conn.send(generate_error_response(200, "GET"))
+                        conn.send(generate_error_response(200, "TRACE"))
                         conn.send(b'Content-Type: message/http\r\n\r\n')
                         conn.send(data)
                         write_to_log(addr[0], request_line, 200, uri)
