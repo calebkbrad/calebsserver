@@ -544,12 +544,12 @@ def main(argv):
                             continue
                                 
 
-                        if len(potential_reps) > 1:
-                            conn.send(generate_error_response(300, method, alternates=potential_reps))
-                            if not keep_alive:
-                                conn.close()
-                                break
-                            continue
+                    if len(potential_reps) > 1:
+                        conn.send(generate_error_response(300, method, alternates=potential_reps))
+                        if not keep_alive:
+                            conn.close()
+                            break
+                        continue
                     if not check_resource(uri):
                         conn.send(generate_error_response(404, method) + CRLF)
                         conn.send(uri.encode('ascii'))
