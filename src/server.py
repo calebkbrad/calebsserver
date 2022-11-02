@@ -493,6 +493,7 @@ def main(argv):
                         method, uri, version, headers, keep_alive, byte_range, accept_headers = validate_and_get_request_info(request)
                     except ValueError as e:
                         conn.send(generate_error_response(400, "GET"))
+                        conn.send(str(e).encode('ascii'))
                         conn.close()
                         print(str(e))
                         break
