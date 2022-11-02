@@ -226,8 +226,9 @@ def normalize_accept_encoding(accept_pairs: list):
 
 def normalize_accept_charset(accept_pairs: list):
     for pair in accept_pairs:
-        if pair[0].strip() in charsets.keys():
-            pair[0] = charset[pair[0]]
+        for charset in charsets.keys():
+            if charsets[charset] == pair[0].strip():
+                pair[0] = charset
 
 def parse_other_accepts(accept_pairs: list, possible_uris: list) -> str:
     existing_uris = []
@@ -534,8 +535,12 @@ def main(argv):
                     potential_reps = check_if_multiple_reps(uri)
                     if accept_headers:
                         for accept_header in accept_headers.keys():
-                            if accept_header == "Content-Encoding":
+                            if accept_header == "Accept-Encoding":
                                 normalize_accept_encoding(accept_headers[accept_header]) 
+                                print("Accept Headers :" + str(accept_headers[accept_header]))
+                            elif accept_header == "Accept-Charset":
+                                normalize_accept_charset(accept_headers[accept_header])
+                                print("Accept Headers :" + str(accept_headers[accept_header]))
                             if accept_header != "Accept":
                                 negotiation = parse_other_accepts(accept_headers[accept_header], potential_reps)
                                 if negotiation == "":
@@ -693,14 +698,14 @@ def main(argv):
                         conn.close()
                         break
             except socket.timeout:
-                conn.send(generate_error_response(408, method) + CRLF)
+                conn.send(generate_error_response(408, "GET") + CRLF)
                 conn.close()
                 write_to_log(addr[0], b"", 408, b"")
                 break
             except Exception as e:
                 print(str(e))
                 sys.stderr.write(str(e))
-                conn.send(generate_error_response(500, method) + CRLF)
+                conn.send(generate_error_response(500, "GET") + CRLF)
                 # write_to_log(addr[0], request_line, 500, uri)
                 conn.send(str(e).encode('ascii'))
                 conn.close()
@@ -709,7 +714,7 @@ def main(argv):
 
     # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: bytes=800-\r\n\r\n
     # GET /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
-    # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAccept-Charset: euc-jp; q=1.0, iso-2022-jp; q=0.0\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-Unmodified-Since: Sat, 01 Oct 2022 10:20:37 GMT\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-None-Match: "49c11da52d38c0512fb8169340db16f3"\r\nConnection: close\r\n\r\n
