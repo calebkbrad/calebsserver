@@ -365,6 +365,8 @@ def generate_error_response(status: int, method: str, alternates=[]) -> bytes:
     full_response += generate_status_code(status)
     full_response += generate_date_header()
     full_response += generate_server()
+    if method == "TRACE":
+        full_response += b'Content-Type: message/http'
     if status != 200:
         full_response +=  b'Content-Type: text/html' + CRLF
         full_response += b'Transfer-Encoding: chunked' + CRLF
@@ -506,7 +508,6 @@ def main(argv):
                     # Handle TRACE execution
                     if method == "TRACE":
                         conn.send(generate_error_response(200, "TRACE"))
-                        conn.send(b'Content-Type: message/http\r\n\r\n')
                         conn.send(data)
                         write_to_log(addr[0], request_line, 200, uri)
                         if not keep_alive:
