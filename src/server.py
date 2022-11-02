@@ -145,7 +145,10 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
             if len(range_string) > 2:
                 continue
             for num in range_string:
-                byte_range.append(int(num))
+                try:
+                    byte_range.append(int(num))
+                except:
+                    continue
             continue
         elif b'Accept' in header:
             try:
