@@ -166,22 +166,6 @@ def check_method(method: str) -> bool:
 def check_version(http_version: str) -> bool:
     return http_version == "HTTP/1.1"
 
-# Check if a resouce has multiple representations given a uri
-def check_if_multiple_reps(uri: str) -> bool:
-    index_last_slash = uri.rfind('/')
-    directory_uri = uri[:index_last_slash]
-    resource = uri[index_last_slash:]
-    possible_uris = listdir(directory_uri)
-    existing_uris = []
-    for possible_uri in possible_uris:
-        print(possible_uri)
-        print(resource)
-        if resource[1:] in possible_uri:
-            existing_uris.append(possible_uri)
-    print(existing_uris)
-    if len(existing_uris) > 1:
-        return True
-    return False
 
 # Generate an etag using md5
 def generate_etag(valid_uri: str) -> bytes:
@@ -225,6 +209,26 @@ def parse_accept(uri: str, accept_element: list) -> str:
     if exists(uri + accept_element[0]):
         pass
     # if len(accept_element) == 1:
+
+# Check if a resouce has multiple representations given a uri
+def check_if_multiple_reps(uri: str) -> list:
+    index_last_slash = uri.rfind('/')
+    directory_uri = uri[:index_last_slash]
+    resource = uri[index_last_slash:]
+    possible_uris = listdir(directory_uri)
+    existing_uris = []
+    for possible_uri in possible_uris:
+        print(possible_uri)
+        print(resource)
+        if resource[1:] in possible_uri:
+            existing_uris.append(possible_uri)
+    return existing_uris
+
+def generate_alternates_header(alternates: list):
+    header = b'Alternates: '
+    for rep in alternates:
+        header += rep.encode('ascii') + b' '
+    return header + CRLF
 
 
 # Generate date header with current time
@@ -303,11 +307,13 @@ def generate_error_payload(status_code: int) -> bytes:
     return file_contents
 
 # Generate generic response headers not associated with content
-def generate_error_response(status: int) -> bytes:
+def generate_error_response(status: int, alternates=[]) -> bytes:
     full_response = b''
     full_response += generate_status_code(status)
     full_response += generate_date_header()
     full_response += generate_server()
+    if alternates:
+        full_response += generate_alternates_header(alternates)
     full_response += b'Connection: close' + CRLF
     if status != 200 and status != 304:
         full_response +=  b'Content-Type: text/html' + CRLF
@@ -480,9 +486,9 @@ def main(argv):
                     print(uri)
                     if '.' not in uri[1:]:
                         print('in . not in uri')
-                        if check_if_multiple_reps(uri):
-                            print('check if multiple reps is true')
-                            conn.send(generate_error_response(300) + CRLF)
+                        potential_reps = check_if_multiple_reps(uri)
+                        if len(potential_reps) > 1:
+                            conn.send(generate_error_response(300, potential_reps))
                             if not keep_alive:
                                 conn.close()
                                 break
@@ -556,17 +562,6 @@ def main(argv):
                             break
                         continue
                     
-                    print('uhuh')
-                    if '.' not in uri:
-                        print('in . not in uri')
-                        if check_if_multiple_reps(uri):
-                            print('check if multiple reps is true')
-                            conn.send(generate_error_response(300) + CRLF)
-                            if not keep_alive:
-                                conn.close()
-                                break
-                            continue
-
                     # Handle OPTIONS execution
                     if method == "OPTIONS":
                         conn.send(generate_error_response(200))
