@@ -486,7 +486,7 @@ def main(argv):
                         print('in . not in uri')
                         potential_reps = check_if_multiple_reps(uri)
                         if len(potential_reps) > 1:
-                            conn.send(generate_error_response(300, method, alternates=potential_reps) + CRLF)
+                            conn.send(generate_error_response(300, method, alternates=potential_reps))
                             if not keep_alive:
                                 conn.close()
                                 break
