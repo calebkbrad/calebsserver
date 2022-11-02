@@ -222,7 +222,7 @@ def parse_other_accepts(accept_pairs: list, possible_uris: list) -> str:
     for pair in accept_pairs:
         pair_type = pair[0].strip()
         for uri in possible_uris:
-            if lang_ext in uri:
+            if pair_type in uri:
                 existing_uris.append(pair)
                 break
     
