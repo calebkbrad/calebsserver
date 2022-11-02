@@ -74,7 +74,6 @@ mime_types = {
     ".log": b'text/plain'
 }
 
-
 virtual_uris = {
     WEBROOT + "/.well-known/access.log": "./access.log"
 }
@@ -200,16 +199,6 @@ def parse_if_match(valid_uri: str, etag: str):
     
     return etag_bytes == uri_etag
 
-def parse_accept(uri: str, accept_element: list) -> str:
-    accept_type = accept_element[0].split('/')[1]
-    directory_uri = uri[:uri.rfind('/')]
-    possible_uris = listdir(directory_uri)
-    if '*' in accept_type:
-        possible_uris
-    if exists(uri + accept_element[0]):
-        pass
-    # if len(accept_element) == 1:
-
 # Check if a resouce has multiple representations given a uri
 def check_if_multiple_reps(uri: str) -> list:
     index_last_slash = uri.rfind('/')
@@ -223,6 +212,53 @@ def check_if_multiple_reps(uri: str) -> list:
         if resource[1:] in possible_uri:
             existing_uris.append(possible_uri)
     return existing_uris
+
+# def parse_accept(accept_pairs: list) -> str:
+#     negotiated_uri = ""
+#     for mime_type in accept_pairs:
+
+def parse_other_accepts(accept_pairs: list, possible_uris: list) -> str:
+    existing_uris = []
+    for pair in accept_pairs:
+        pair_type = pair[0].strip()
+        for uri in possible_uris:
+            if lang_ext in uri:
+                existing_uris.append(pair)
+                break
+    
+    if existing_uris:
+        current_q_val = -1.0
+        current_type = ""
+        for pair in existing_uris:
+            if len(pair) == 2:
+                q_val = pair[1]
+                if q_val == 0.0:
+                    continue
+                if current_q_val < q_val:
+                    current_q_val = q_val
+                    current_type = pair[0].strip()
+                elif q_val == current_q_val:
+                    current_q_val = 2.0
+            else:
+                current_type = pair[0].strip()
+                current_q_val = 3.0
+                break
+        if current_q_val == -1.0:
+            return ""
+        elif current_q_val == 2.0:
+            return "multiple"
+        else:
+            return current_type
+    
+
+            
+
+# Given a dictionary of accepts, determines the uri with the highest q value (if applicable)
+def parse_accepts(accept_dict: dict, uri: str) -> str:
+    possible_uris = check_if_multiple_reps(uri)
+    if not possible_uris:
+        return ""
+    
 
 def generate_alternates_header(alternates: list):
     header = b'Alternates: '
@@ -483,8 +519,32 @@ def main(argv):
                             break
                         continue
                     if '.' not in uri[1:]:
-                        print('in . not in uri')
+                        already_processed = False
                         potential_reps = check_if_multiple_reps(uri)
+                        if accept_headers:
+                            for accept_header in accept_headers.keys():
+                                if accept_header != "Accept":
+                                    negotiation = parse_other_accepts(accept_headers[accept_header], potential_reps)
+                                    if negotiation == "":
+                                        conn.send(generate_error_response(406, method))
+                                        already_processed = True
+                                        break
+                                    elif negotiation == "multiple":
+                                        conn.send(generate_error_response(300, method))
+                                        already_processed = True
+                                        break
+                                    else:
+                                        for rep in potential_reps:
+                                            if rep == negotiation:
+                                                directory_uri = uri[:uri.rfind('/')]
+                                                uri = directory_uri + rep
+                            if already_processed:
+                                if not keep_alive:
+                                    conn.close()
+                                    break
+                                continue
+                                
+
                         if len(potential_reps) > 1:
                             conn.send(generate_error_response(300, method, alternates=potential_reps))
                             if not keep_alive:
