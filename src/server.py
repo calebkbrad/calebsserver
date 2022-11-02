@@ -366,7 +366,9 @@ def generate_error_response(status: int, method: str, alternates=[]) -> bytes:
     full_response += generate_date_header()
     full_response += generate_server()
     if method == "TRACE":
-        full_response += b'Content-Type: message/http'
+        full_response += b'Content-Type: message/http' + CRLF
+    elif method == "OPTIONS":
+        full_response += generate_allow() + CRLF
     if status != 200:
         full_response +=  b'Content-Type: text/html' + CRLF
         full_response += b'Transfer-Encoding: chunked' + CRLF
@@ -649,7 +651,6 @@ def main(argv):
                     # Handle OPTIONS execution
                     if method == "OPTIONS":
                         conn.send(generate_error_response(200, method))
-                        conn.send(generate_allow() + CRLF)
                         write_to_log(addr[0], request_line, 200, uri)
                     # Handle HEAD execution
                     elif method == "HEAD":
