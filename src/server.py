@@ -316,7 +316,7 @@ def generate_error_response(status: int, method: str, alternates=[]) -> bytes:
     full_response += b'Transfer-Encoding: chunked' + CRLF
     if alternates:
         full_response += generate_alternates_header(alternates)
-    full_response += b'Connection: close' + CRLF
+    full_response += b'Connection: close' + CRLFCRLF
     if status != 200 and status != 304 and method == "GET":
         full_response += generate_error_payload(status)
     return full_response
