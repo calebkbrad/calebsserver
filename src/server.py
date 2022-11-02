@@ -312,12 +312,12 @@ def generate_error_response(status: int, method: str, alternates=[]) -> bytes:
     full_response += generate_status_code(status)
     full_response += generate_date_header()
     full_response += generate_server()
+    full_response +=  b'Content-Type: text/html' + CRLF
+    full_response += b'Transfer-Encoding: chunked' + CRLFCRLF
     if alternates:
         full_response += generate_alternates_header(alternates)
     full_response += b'Connection: close' + CRLF
     if status != 200 and status != 304 and method == "GET":
-        full_response +=  b'Content-Type: text/html' + CRLF
-        full_response += b'Transfer-Encoding: chunked' + CRLFCRLF
         full_response += generate_error_payload(status)
     return full_response
 
