@@ -53,6 +53,7 @@ status_codes = {
     "400": b"400 Bad Request",
     "403": b"403 Forbidden",
     "404": b"404 Not Found",
+    "406": b'406 Not Acceptable',
     "408": b"408 Request Timeout",
     "412": b"412 Precondition Failed",
     "500": b"500 Internal Server Error",
