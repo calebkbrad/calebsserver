@@ -217,6 +217,14 @@ def check_if_multiple_reps(uri: str) -> list:
 #     negotiated_uri = ""
 #     for mime_type in accept_pairs:
 
+def normalize_accept_encoding(accept_pairs: list):
+    for pair in accept_pairs:
+        if pair[0].strip() == "gzip":
+            pair[0] = "gz"
+        elif pair[0].strip() == "compress":
+            pair[0] = "Z"
+        
+
 def parse_other_accepts(accept_pairs: list, possible_uris: list) -> str:
     existing_uris = []
     for pair in accept_pairs:
@@ -522,6 +530,8 @@ def main(argv):
                     potential_reps = check_if_multiple_reps(uri)
                     if accept_headers:
                         for accept_header in accept_headers.keys():
+                            if accept_header == "Content-Encoding":
+                                normalize_accept_encoding(accept_headers[accept_header]) 
                             if accept_header != "Accept":
                                 negotiation = parse_other_accepts(accept_headers[accept_header], potential_reps)
                                 if negotiation == "":
