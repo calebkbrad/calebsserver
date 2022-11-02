@@ -553,6 +553,7 @@ def main(argv):
                             continue
                     if not check_resource(uri):
                         conn.send(generate_error_response(404, method) + CRLF)
+                        conn.send(uri.encode('ascii'))
                         write_to_log(addr[0], request_line, 404, uri)
                         if not keep_alive:
                             conn.close()
