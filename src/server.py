@@ -46,6 +46,7 @@ with open(CHARSETS, 'r') as f:
 status_codes = {
     "200": b"200 OK",
     "206": b'206 Partial Content',
+    "300": b'300 Multiple Choice',
     "301": b"301 Moved Permanently",
     "302": b"302 Found",
     "304": b"304 Not Modified",
@@ -167,15 +168,18 @@ def check_version(http_version: str) -> bool:
 
 # Check if a resouce has multiple representations given a uri
 def check_if_multiple_reps(uri: str) -> bool:
-    index_last_slash = uri[:uri.rfind('/')]
+    index_last_slash = uri.rfind('/')
     directory_uri = uri[:index_last_slash]
     resource = uri[index_last_slash:]
     possible_uris = listdir(directory_uri)
     existing_uris = []
     for possible_uri in possible_uris:
-        if resource in possible_uri:
+        print(possible_uri)
+        print(resource)
+        if resource[1:] in possible_uri:
             existing_uris.append(possible_uri)
-    if len(existing_uris > 1):
+    print(existing_uris)
+    if len(existing_uris) > 1:
         return True
     return False
 
@@ -473,6 +477,16 @@ def main(argv):
                             conn.close()
                             break
                         continue
+                    print(uri)
+                    if '.' not in uri[1:]:
+                        print('in . not in uri')
+                        if check_if_multiple_reps(uri):
+                            print('check if multiple reps is true')
+                            conn.send(generate_error_response(300) + CRLF)
+                            if not keep_alive:
+                                conn.close()
+                                break
+                            continue
                     if not check_resource(uri):
                         conn.send(generate_error_response(404) + CRLF)
                         write_to_log(addr[0], request_line, 404, uri)
@@ -542,9 +556,12 @@ def main(argv):
                             break
                         continue
                     
+                    print('uhuh')
                     if '.' not in uri:
+                        print('in . not in uri')
                         if check_if_multiple_reps(uri):
-                            conn.send(generate_error_response(300))
+                            print('check if multiple reps is true')
+                            conn.send(generate_error_response(300) + CRLF)
                             if not keep_alive:
                                 conn.close()
                                 break
@@ -624,8 +641,8 @@ def main(argv):
 
 
     # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: bytes=800-\r\n\r\n
-    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
-    # HEAD /text.html.jis HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # GET /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
+    # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-Unmodified-Since: Sat, 01 Oct 2022 10:20:37 GMT\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-None-Match: "49c11da52d38c0512fb8169340db16f3"\r\nConnection: close\r\n\r\n
