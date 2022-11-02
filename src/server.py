@@ -529,7 +529,7 @@ def main(argv):
                                     already_processed = True
                                     break
                                 elif negotiation == "multiple":
-                                    conn.send(generate_error_response(300, method))
+                                    conn.send(generate_error_response(300, method, alternates=potential_reps))
                                     already_processed = True
                                     break
                                 else:
