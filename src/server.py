@@ -518,31 +518,30 @@ def main(argv):
                             conn.close()
                             break
                         continue
-                    if '.' not in uri[1:]:
-                        already_processed = False
-                        potential_reps = check_if_multiple_reps(uri)
-                        if accept_headers:
-                            for accept_header in accept_headers.keys():
-                                if accept_header != "Accept":
-                                    negotiation = parse_other_accepts(accept_headers[accept_header], potential_reps)
-                                    if negotiation == "":
-                                        conn.send(generate_error_response(406, method))
-                                        already_processed = True
-                                        break
-                                    elif negotiation == "multiple":
-                                        conn.send(generate_error_response(300, method))
-                                        already_processed = True
-                                        break
-                                    else:
-                                        for rep in potential_reps:
-                                            if rep == negotiation:
-                                                directory_uri = uri[:uri.rfind('/')]
-                                                uri = directory_uri + rep
-                            if already_processed:
-                                if not keep_alive:
-                                    conn.close()
+                    already_processed = False
+                    potential_reps = check_if_multiple_reps(uri)
+                    if accept_headers:
+                        for accept_header in accept_headers.keys():
+                            if accept_header != "Accept":
+                                negotiation = parse_other_accepts(accept_headers[accept_header], potential_reps)
+                                if negotiation == "":
+                                    conn.send(generate_error_response(406, method))
+                                    already_processed = True
                                     break
-                                continue
+                                elif negotiation == "multiple":
+                                    conn.send(generate_error_response(300, method))
+                                    already_processed = True
+                                    break
+                                else:
+                                    for rep in potential_reps:
+                                        if rep == negotiation:
+                                            directory_uri = uri[:uri.rfind('/')]
+                                            uri = directory_uri + rep
+                        if already_processed:
+                            if not keep_alive:
+                                conn.close()
+                                break
+                            continue
                                 
 
                         if len(potential_reps) > 1:
