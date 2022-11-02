@@ -534,7 +534,7 @@ def main(argv):
                         continue
                     already_processed = False
                     potential_reps = check_if_multiple_reps(uri)
-                    if accept_headers:
+                    if accept_headers and not uri.endswith(".Z") and not uri.endswith(".gzip"):
                         for accept_header in accept_headers.keys():
                             if accept_header == "Accept-Encoding":
                                 normalize_accept_encoding(accept_headers[accept_header]) 
