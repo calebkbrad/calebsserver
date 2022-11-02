@@ -307,7 +307,7 @@ def generate_error_payload(status_code: int) -> bytes:
     return file_contents
 
 # Generate generic response headers not associated with content
-def generate_error_response(status: int, alternates=[]) -> bytes:
+def generate_error_response(status: int, method: str, alternates=[]) -> bytes:
     full_response = b''
     full_response += generate_status_code(status)
     full_response += generate_date_header()
@@ -315,7 +315,7 @@ def generate_error_response(status: int, alternates=[]) -> bytes:
     if alternates:
         full_response += generate_alternates_header(alternates)
     full_response += b'Connection: close' + CRLF
-    if status != 200 and status != 304:
+    if status != 200 and status != 304 and method == "GET":
         full_response +=  b'Content-Type: text/html' + CRLF
         full_response += b'Transfer-Encoding: chunked' + CRLFCRLF
         full_response += generate_error_payload(status)
@@ -442,8 +442,7 @@ def main(argv):
                     try:
                         method, uri, version, headers, keep_alive, byte_range, accept_headers = validate_and_get_request_info(request)
                     except ValueError as e:
-                        conn.send(generate_error_response(400))
-                        conn.send(generate_error_payload(400))
+                        conn.send(generate_error_response(400, "GET"))
                         conn.close()
                         print(str(e))
                         break
@@ -451,7 +450,7 @@ def main(argv):
                     request_line = data.split(CRLF)[0]
                     # Handle TRACE execution
                     if method == "TRACE":
-                        conn.send(generate_error_response(200))
+                        conn.send(generate_error_response(200, "GET"))
                         conn.send(b'Content-Type: message/http\r\n\r\n')
                         conn.send(data)
                         write_to_log(addr[0], request_line, 200, uri)
@@ -461,14 +460,14 @@ def main(argv):
                         continue
                     # Return error responses if appropriate
                     if not check_method(method):
-                        conn.send(generate_error_response(501) + CRLF)
+                        conn.send(generate_error_response(501, "GET") + CRLF)
                         write_to_log(addr[0], request_line, 501, uri)
                         if not keep_alive:
                             conn.close()
                             break
                         continue
                     if not check_version(version):
-                        conn.send(generate_error_response(505) + CRLF)
+                        conn.send(generate_error_response(505, method) + CRLF)
                         write_to_log(addr[0], request_line, 505, uri)
                         if not keep_alive:
                             conn.close()
@@ -483,18 +482,17 @@ def main(argv):
                             conn.close()
                             break
                         continue
-                    print(uri)
                     if '.' not in uri[1:]:
                         print('in . not in uri')
                         potential_reps = check_if_multiple_reps(uri)
                         if len(potential_reps) > 1:
-                            conn.send(generate_error_response(300, potential_reps))
+                            conn.send(generate_error_response(300, method, alternates=potential_reps))
                             if not keep_alive:
                                 conn.close()
                                 break
                             continue
                     if not check_resource(uri):
-                        conn.send(generate_error_response(404) + CRLF)
+                        conn.send(generate_error_response(404, method) + CRLF)
                         write_to_log(addr[0], request_line, 404, uri)
                         if not keep_alive:
                             conn.close()
@@ -509,28 +507,28 @@ def main(argv):
                                 if parse_if_modified_since(uri, conditional_headers[conditional]):
                                     continue
                                 else:
-                                    conn.send(generate_error_response(304) + CRLF)
+                                    conn.send(generate_error_response(304, method) + CRLF)
                                     already_processed = True
                                     break
                             elif "Unmodified" in conditional:
                                 if not parse_if_modified_since(uri, conditional_headers[conditional]):
                                     continue
                                 else:
-                                    conn.send(generate_error_response(412) + CRLF)
+                                    conn.send(generate_error_response(412, method) + CRLF)
                                     already_processed = True
                                     break
                             elif "None" in conditional:
                                 if not parse_if_match(uri, conditional_headers[conditional]):
                                     continue
                                 else:
-                                    conn.send(generate_error_response(304) + CRLF)
+                                    conn.send(generate_error_response(304, method) + CRLF)
                                     already_processed = True
                                     break
                             elif "Match" in conditional:
                                 if parse_if_match(uri, conditional_headers[conditional]):
                                     continue
                                 else:
-                                    conn.send(generate_error_response(412) + CRLF)
+                                    conn.send(generate_error_response(412, method) + CRLF)
                                     already_processed = True
                                     break
                         except ValueError:
@@ -564,7 +562,7 @@ def main(argv):
                     
                     # Handle OPTIONS execution
                     if method == "OPTIONS":
-                        conn.send(generate_error_response(200))
+                        conn.send(generate_error_response(200, method))
                         conn.send(generate_allow() + CRLF)
                         write_to_log(addr[0], request_line, 200, uri)
                     # Handle HEAD execution
@@ -621,14 +619,14 @@ def main(argv):
                         conn.close()
                         break
             except socket.timeout:
-                conn.send(generate_error_response(408) + CRLF)
+                conn.send(generate_error_response(408, method) + CRLF)
                 conn.close()
                 write_to_log(addr[0], b"", 408, b"")
                 break
             except Exception as e:
                 print(str(e))
                 sys.stderr.write(str(e))
-                conn.send(generate_error_response(500) + CRLF)
+                conn.send(generate_error_response(500, method) + CRLF)
                 # write_to_log(addr[0], request_line, 500, uri)
                 conn.send(str(e).encode('ascii'))
                 conn.close()
