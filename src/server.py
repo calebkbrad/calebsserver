@@ -251,7 +251,7 @@ def parse_other_accepts(accept_pairs: list, possible_uris: list) -> str:
                 current_type = pair[0].strip()
                 current_q_val = 3.0
                 break
-        if current_q_val == -1.0:
+        if current_q_val == -1.0 or current_q_val == 0.0:
             return ""
         elif current_q_val == 2.0:
             return "multiple"
