@@ -223,7 +223,11 @@ def normalize_accept_encoding(accept_pairs: list):
             pair[0] = "gz"
         elif pair[0].strip() == "compress":
             pair[0] = "Z"
-        
+
+def normalize_accept_charset(accept_pairs: list):
+    for pair in accept_pairs:
+        if pair[0].strip() in charsets.keys():
+            pair[0] = charset[pair[0]]
 
 def parse_other_accepts(accept_pairs: list, possible_uris: list) -> str:
     existing_uris = []
