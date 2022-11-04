@@ -546,6 +546,7 @@ def main(argv):
                             break
                         continue
                     potential_reps = check_if_multiple_reps(uri)
+                    conn.send(str(potential_reps).encode('ascii'))
                     if not isdir(uri) and potential_reps:
                         already_processed = False
                         if accept_headers and not uri.endswith(".Z") and not uri.endswith(".gzip"):
