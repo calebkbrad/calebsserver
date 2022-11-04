@@ -215,7 +215,10 @@ def check_if_multiple_reps(uri: str) -> list:
     index_last_slash = uri.rfind('/')
     directory_uri = uri[:index_last_slash]
     resource = uri[index_last_slash:]
-    possible_uris = listdir(directory_uri)
+    try:
+        possible_uris = listdir(directory_uri)
+    except:
+        return []
     existing_uris = []
     for possible_uri in possible_uris:
         # print(possible_uri)
@@ -546,7 +549,6 @@ def main(argv):
                             break
                         continue
                     potential_reps = check_if_multiple_reps(uri)
-                    conn.send(str(potential_reps).encode('ascii'))
                     if not isdir(uri) and potential_reps:
                         already_processed = False
                         if accept_headers and not uri.endswith(".Z") and not uri.endswith(".gzip"):
