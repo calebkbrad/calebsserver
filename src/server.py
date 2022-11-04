@@ -545,9 +545,9 @@ def main(argv):
                             conn.close()
                             break
                         continue
-                    if not isdir(uri):
+                    potential_reps = check_if_multiple_reps(uri)
+                    if not isdir(uri) and potential_reps:
                         already_processed = False
-                        potential_reps = check_if_multiple_reps(uri)
                         if accept_headers and not uri.endswith(".Z") and not uri.endswith(".gzip"):
                             for accept_header in accept_headers.keys():
                                 if accept_header == "Accept-Encoding":
