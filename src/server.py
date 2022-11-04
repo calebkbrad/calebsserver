@@ -421,7 +421,6 @@ def generate_redirect_headers(redirect_uri: str, status_code: int):
 # Check if a resource exists, given a normalized uri (relative path)
 def check_resource(uri: str) -> bool:
     return exists(uri)
-
 def generate_directory_listing(directory_uri: str) -> bytes:
     list_table_elements = []
     for f in listdir(directory_uri):
@@ -659,34 +658,37 @@ def main(argv):
                         conn.send(generate_error_response(200, method))
                         write_to_log(addr[0], request_line, 200, uri)
                     # Handle HEAD execution
-                    elif method == "HEAD":
-                        if isdir(uri):
-                            if exists(uri + DEFAULTRESOURCE):
-                                uri = uri + DEFAULTRESOURCE
-                                conn.send(generate_status_code(200))
-                                conn.send(generate_success_response_headers(uri) + CRLF)
-                            else:
-                                conn.send(generate_directory_response(uri))
-                        else:
-                            conn.send(generate_status_code(200))
-                            conn.send(generate_success_response_headers(uri) + CRLF)
-                            write_to_log(addr[0], request_line, 200, uri)
+                    # elif method == "HEAD":
+                    #     if isdir(uri):
+                    #         if exists(uri + DEFAULTRESOURCE):
+                    #             uri = uri + DEFAULTRESOURCE
+                    #             conn.send(generate_status_code(200))
+                    #             conn.send(generate_success_response_headers(uri) + CRLF)
+                    #         else:
+                    #             conn.send(generate_directory_response(uri))
+                    #     else:
+                    #         conn.send(generate_status_code(200))
+                    #         conn.send(generate_success_response_headers(uri) + CRLF)
+                    #         write_to_log(addr[0], request_line, 200, uri)
                     # Handle GET execution
-                    elif method == "GET":
+                    elif method == "GET" or method == "HEAD":
                         if isdir(uri):
                             if exists(uri + DEFAULTRESOURCE):
                                 uri = uri + DEFAULTRESOURCE
                                 conn.send(generate_status_code(200))
                                 conn.send(generate_success_response_headers(uri) + CRLF)
-                                conn.send(generate_payload(uri))
+                                if method == "GET":
+                                    conn.send(generate_payload(uri))
                             else:
                                 conn.send(generate_directory_response(uri))
-                                conn.send(generate_directory_listing(uri))
+                                if method == "GET":
+                                    conn.send(generate_directory_listing(uri))
                         else:
                             if not byte_range:
                                 conn.send(generate_status_code(200))
                                 conn.send(generate_success_response_headers(uri) + CRLF)
-                                conn.send(generate_payload(uri))
+                                if method == "GET":
+                                    conn.send(generate_payload(uri))
                             else:
                                 if len(byte_range) == 1:
                                     content_range = byte_range[0]
@@ -694,7 +696,8 @@ def main(argv):
                                     length = len(payload)
                                     conn.send(generate_status_code(206))
                                     conn.send(generate_success_response_headers(uri, length) + CRLF)
-                                    conn.send(payload)
+                                    if method == "GET":
+                                        conn.send(payload)
                                 else:
                                     content_range_lower, content_range_upper = byte_range
                                     payload = generate_payload(uri)[content_range_lower:content_range_upper+1]
@@ -705,7 +708,8 @@ def main(argv):
                                     file_size = os.path.getsize(uri)
                                     conn.send(b'Content-Range: bytes ' + content_range_lower + b'-' + content_range_upper + b'/' + str(file_size).encode('ascii') + CRLF)
                                     conn.send(generate_success_response_headers(uri, length) + CRLF)
-                                    conn.send(payload)
+                                    if method == "GET":
+                                        conn.send(payload)
                             
                         write_to_log(addr[0], request_line, 200, uri)
                     if not keep_alive:
@@ -726,7 +730,7 @@ def main(argv):
                 break
 
 
-    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: bytes=-100\r\n\r\n
+    # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: bytes=-100\r\n\r\n
     # GET /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
     # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAccept-Charset: euc-jp; q=1.0, iso-2022-jp; q=0.0\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
