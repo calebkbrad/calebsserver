@@ -19,7 +19,10 @@ WEBROOT = config["WEBROOT"]
 TIMEOUT = config["TIMEOUT"]
 DEFAULTRESOURCE = config["DEFAULTRESOURCE"]
 REDIRECTFILE = config["REDIRECTS"]
+LANGUAGES = config["LANGUAGES"]
+CHARSETS = config["CHARSETS"]
 
+# Parse redirect regex config file
 with open(REDIRECTFILE, 'r') as f:
     redirects = []
     for line in f.readlines():
@@ -27,15 +30,30 @@ with open(REDIRECTFILE, 'r') as f:
         redirect[0] = int(redirect[0][:-1])
         redirects.append(redirect)
 
+# Parse content language config file
+with open(LANGUAGES, 'r') as f:
+    languages = []
+    for line in f.readlines():
+        languages.append('.' + line.strip())
+
+with open(CHARSETS, 'r') as f:
+    charsets = {}
+    for line in f.readlines():
+        separate = line.split()
+        charsets.update({separate[0]: separate[1]})
+
 # Dictionary of status codes
 status_codes = {
     "200": b"200 OK",
+    "206": b'206 Partial Content',
+    "300": b'300 Multiple Choice',
     "301": b"301 Moved Permanently",
     "302": b"302 Found",
     "304": b"304 Not Modified",
     "400": b"400 Bad Request",
     "403": b"403 Forbidden",
     "404": b"404 Not Found",
+    "406": b'406 Not Acceptable',
     "408": b"408 Request Timeout",
     "412": b"412 Precondition Failed",
     "500": b"500 Internal Server Error",
@@ -60,6 +78,25 @@ mime_types = {
 virtual_uris = {
     WEBROOT + "/.well-known/access.log": "./access.log"
 }
+
+# Given an accept header, split it up into appropriate content describer and q values
+def split_accepts(header: bytes) -> list:
+    accept_header = header.decode('utf-8')
+    options = accept_header.split(':')[1]
+    list_options = options.split(',')
+    accept = []
+    for option in list_options:
+        value_pair = []
+        if ';' not in option:
+            value_pair.append(option)
+        else:
+            # print(option)
+            attr, qval = option.split(';')
+            qval = float(qval.split('q=')[1])
+            value_pair.append(attr)
+            value_pair.append(qval)
+        accept.append(value_pair)
+    return accept
 
 def validate_and_get_request_info(http_request: bytes) -> tuple:
     request_and_headers = http_request.split(CRLF)
@@ -94,8 +131,42 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     
     if b'Connection: close' in headers:
         keep_alive = False
-    
-    return (method, uri, http_version, headers, keep_alive)
+
+    byte_range = []
+    accept_headers = {}
+    for header in headers:
+        if b'Range:' in header:
+            try:
+                range_string = header.split(b': bytes=')[1].decode('utf-8')
+            except IndexError:
+                print('index error happened')
+                continue
+            print(len(list(filter(None, range_string.split('-')))))
+            if len(list(filter(None, range_string.split('-')))) != 1:
+                print('in split')
+                range_string = range_string.split('-')
+                if len(range_string) > 2:
+                    continue
+                print(range_string)
+                for num in range_string:
+                    try:
+                        byte_range.append(int(num))
+                    except:
+                        continue
+            else:
+                byte_range.append(int(range_string))
+            print(byte_range)
+            continue
+        elif b'Accept' in header:
+            try:
+                key = header.decode('utf-8').split(':')[0]
+                accept_headers.update({key: split_accepts(header)})
+            except IndexError:
+                print('index error happened')
+                continue
+
+    # print(accept_headers)
+    return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers)
 
 # Check if a method is currently supported
 def check_method(method: str) -> bool:
@@ -104,6 +175,7 @@ def check_method(method: str) -> bool:
 # Check if version 1.1 is being used
 def check_version(http_version: str) -> bool:
     return http_version == "HTTP/1.1"
+
 
 # Generate an etag using md5
 def generate_etag(valid_uri: str) -> bytes:
@@ -138,6 +210,89 @@ def parse_if_match(valid_uri: str, etag: str):
     
     return etag_bytes == uri_etag
 
+# Check if a resouce has multiple representations given a uri
+def check_if_multiple_reps(uri: str) -> list:
+    index_last_slash = uri.rfind('/')
+    directory_uri = uri[:index_last_slash]
+    resource = uri[index_last_slash:]
+    try:
+        possible_uris = listdir(directory_uri)
+    except:
+        return []
+    existing_uris = []
+    for possible_uri in possible_uris:
+        # print(possible_uri)
+        # print(resource)
+        if resource[1:] in possible_uri:
+            existing_uris.append(possible_uri)
+    return existing_uris
+
+# def parse_accept(accept_pairs: list) -> str:
+#     negotiated_uri = ""
+#     for mime_type in accept_pairs:
+
+def normalize_accept_encoding(accept_pairs: list):
+    for pair in accept_pairs:
+        if pair[0].strip() == "gzip":
+            pair[0] = "gz"
+        elif pair[0].strip() == "compress":
+            pair[0] = "Z"
+
+def normalize_accept_charset(accept_pairs: list):
+    for pair in accept_pairs:
+        for charset in charsets.keys():
+            if charsets[charset] == pair[0].strip():
+                pair[0] = charset
+
+def parse_other_accepts(accept_pairs: list, possible_uris: list) -> str:
+    existing_uris = []
+    for pair in accept_pairs:
+        pair_type = pair[0].strip()
+        for uri in possible_uris:
+            if pair_type in uri:
+                existing_uris.append(pair)
+                break
+    
+    if existing_uris:
+        current_q_val = -1.0
+        current_type = ""
+        for pair in existing_uris:
+            if len(pair) == 2:
+                q_val = pair[1]
+                if q_val == 0.0:
+                    continue
+                if current_q_val < q_val:
+                    current_q_val = q_val
+                    current_type = pair[0].strip()
+                elif q_val == current_q_val:
+                    return "multiple"
+            else:
+                current_type = pair[0].strip()
+                current_q_val = 3.0
+                break
+        if current_q_val == -1.0 or current_q_val == 0.0:
+            return ""
+        else:
+            return current_type
+    return ""
+    
+
+            
+
+# Given a dictionary of accepts, determines the uri with the highest q value (if applicable)
+def parse_accepts(accept_dict: dict, uri: str) -> str:
+    possible_uris = check_if_multiple_reps(uri)
+    if not possible_uris:
+        return ""
+    
+
+def generate_alternates_header(alternates: list):
+    header = b'Alternates: '
+    for rep in alternates:
+        header += rep.encode('ascii') + b' '
+    return header + CRLF
+
+
 # Generate date header with current time
 def generate_date_header() -> bytes:
     current_time = time.strftime("%a, %d %b %Y %I:%M:%S GMT", time.gmtime())
@@ -149,16 +304,37 @@ def generate_content_length(valid_uri: str) -> bytes:
     file_size = os.path.getsize(valid_uri)
     return b'Content-Length: ' + str(file_size).encode('ascii') + CRLF
 
-# Generate Content-Type header given a valid uri
+# Generate Content-Type header given a valid uri. Also generate Content-Language, Content-Encoding, and Charset-Encoding
 def generate_content_type(valid_uri: str) -> bytes:
     content_type = b''
+    content_lang = b''
+    content_encoding = b''
+    charset_encoding = b''
     for mime_type in mime_types.keys():
-        if valid_uri.endswith(mime_type):
+        if mime_type in valid_uri:
             content_type += mime_types[mime_type]
     if content_type == b'':
         content_type += b'application/octet-stream'
-    
-    return b'Content-Type: ' + content_type + CRLF
+    else:
+        for lang in languages:
+            if lang in valid_uri:
+                content_lang = lang.encode('ascii')[1:]
+        if valid_uri.endswith('.Z'):
+            content_encoding += b'compress'
+        elif valid_uri.endswith('.gz'):
+            content_encoding += b'gzip'
+        for charset in charsets.keys():
+            if charset in valid_uri:
+                charset_encoding +=b'; charset=' + charsets[charset].encode('ascii')
+
+
+    full_headers = b'Content-Type: ' + content_type + charset_encoding + CRLF
+    if content_lang:
+        full_headers += b'Content-Language: ' + content_lang + CRLF
+    if content_encoding:
+        full_headers += b'Content-Encoding: ' + content_encoding + CRLF
+
+    return full_headers
 
 # Generate Last-Modified header given a valid uri
 def generate_last_modified(valid_uri: str):
@@ -189,28 +365,41 @@ def generate_error_payload(status_code: int) -> bytes:
             file_contents += byte
             if not byte:
                 break
+    
     return file_contents
 
 # Generate generic response headers not associated with content
-def generate_error_response(status: int) -> bytes:
+def generate_error_response(status: int, method: str, alternates=[]) -> bytes:
     full_response = b''
     full_response += generate_status_code(status)
     full_response += generate_date_header()
     full_response += generate_server()
-    full_response += b'Connection: close' + CRLF
-    if status != 200 and status != 304:
-        full_response += CRLF + b'Content-Type: text/html' + b'\r\n'
+    if method == "TRACE":
+        full_response += b'Content-Type: message/http' + CRLF
+    elif method == "OPTIONS":
+        full_response += generate_allow() + CRLF
+    if status != 200:
+        full_response +=  b'Content-Type: text/html' + CRLF
+        full_response += b'Transfer-Encoding: chunked' + CRLF
+    if alternates:
+        full_response += generate_alternates_header(alternates)
+    full_response += b'Connection: close' + CRLFCRLF
+    if status != 200 and status != 304 and method == "GET":
         full_response += generate_error_payload(status)
     return full_response
 
 # Generate respones headers associated with found content
-def generate_success_response_headers(uri: str) -> bytes:
+def generate_success_response_headers(uri: str, length=0) -> bytes:
     headers = b''
     headers += generate_date_header()
     headers += generate_server()
     headers += generate_content_type(uri)
     headers += generate_last_modified(uri)
-    headers += generate_content_length(uri)
+    if length == 0:
+        headers += generate_content_length(uri)
+    else:
+        bytes_length = str(length).encode('ascii')
+        headers += b'Content-Length: ' + bytes_length + CRLF
     headers += generate_etag(uri)
     return headers
 
@@ -235,7 +424,6 @@ def generate_redirect_headers(redirect_uri: str, status_code: int):
 # Check if a resource exists, given a normalized uri (relative path)
 def check_resource(uri: str) -> bool:
     return exists(uri)
-
 def generate_directory_listing(directory_uri: str) -> bytes:
     list_table_elements = []
     for f in listdir(directory_uri):
@@ -318,18 +506,18 @@ def main(argv):
         
                 for request in requests:   
                     try:
-                        method, uri, version, headers, keep_alive = validate_and_get_request_info(request)
-                    except ValueError:
-                        conn.send(generate_error_response(400))
-                        conn.send(generate_error_payload(400))
+                        method, uri, version, headers, keep_alive, byte_range, accept_headers = validate_and_get_request_info(request)
+                    except ValueError as e:
+                        conn.send(generate_error_response(400, "GET"))
+                        conn.send(str(e).encode('ascii'))
                         conn.close()
+                        print(str(e))
                         break
 
                     request_line = data.split(CRLF)[0]
                     # Handle TRACE execution
                     if method == "TRACE":
-                        conn.send(generate_error_response(200))
-                        conn.send(b'Content-Type: message/http\r\n\r\n')
+                        conn.send(generate_error_response(200, "TRACE"))
                         conn.send(data)
                         write_to_log(addr[0], request_line, 200, uri)
                         if not keep_alive:
@@ -338,14 +526,14 @@ def main(argv):
                         continue
                     # Return error responses if appropriate
                     if not check_method(method):
-                        conn.send(generate_error_response(501) + CRLF)
+                        conn.send(generate_error_response(501, "GET") + CRLF)
                         write_to_log(addr[0], request_line, 501, uri)
                         if not keep_alive:
                             conn.close()
                             break
                         continue
                     if not check_version(version):
-                        conn.send(generate_error_response(505) + CRLF)
+                        conn.send(generate_error_response(505, method) + CRLF)
                         write_to_log(addr[0], request_line, 505, uri)
                         if not keep_alive:
                             conn.close()
@@ -360,8 +548,46 @@ def main(argv):
                             conn.close()
                             break
                         continue
+                    potential_reps = check_if_multiple_reps(uri)
+                    if not isdir(uri) and potential_reps:
+                        already_processed = False
+                        if accept_headers and not uri.endswith(".Z") and not uri.endswith(".gzip"):
+                            for accept_header in accept_headers.keys():
+                                if accept_header == "Accept-Encoding":
+                                    normalize_accept_encoding(accept_headers[accept_header]) 
+                                    # print("Accept Headers :" + str(accept_headers[accept_header]))
+                                elif accept_header == "Accept-Charset":
+                                    normalize_accept_charset(accept_headers[accept_header])
+                                    # print("Accept Headers :" + str(accept_headers[accept_header]))
+                                if accept_header != "Accept":
+                                    negotiation = parse_other_accepts(accept_headers[accept_header], potential_reps)
+                                    if negotiation == "":
+                                        conn.send(generate_error_response(406, method))
+                                        already_processed = True
+                                        break
+                                    elif negotiation == "multiple":
+                                        conn.send(generate_error_response(300, method, alternates=potential_reps))
+                                        already_processed = True
+                                        break
+                                    else:
+                                        for rep in potential_reps:
+                                            if rep == negotiation:
+                                                directory_uri = uri[:uri.rfind('/')]
+                                                uri = directory_uri + rep
+                            if already_processed:
+                                if not keep_alive:
+                                    conn.close()
+                                    break
+                                continue
+                                    
+                        if len(potential_reps) > 1:
+                            conn.send(generate_error_response(300, method, alternates=potential_reps))
+                            if not keep_alive:
+                                conn.close()
+                                break
+                            continue
                     if not check_resource(uri):
-                        conn.send(generate_error_response(404) + CRLF)
+                        conn.send(generate_error_response(404, method) + CRLF)
                         conn.send(uri.encode('ascii'))
                         write_to_log(addr[0], request_line, 404, uri)
                         if not keep_alive:
@@ -372,33 +598,33 @@ def main(argv):
                     already_processed = False
                     for conditional in conditional_headers.keys():
                         try:
-                            print(conditional)
+                            # print(conditional)
                             if "Modified" in conditional:
                                 if parse_if_modified_since(uri, conditional_headers[conditional]):
                                     continue
                                 else:
-                                    conn.send(generate_error_response(304) + CRLF)
+                                    conn.send(generate_error_response(304, method) + CRLF)
                                     already_processed = True
                                     break
                             elif "Unmodified" in conditional:
                                 if not parse_if_modified_since(uri, conditional_headers[conditional]):
                                     continue
                                 else:
-                                    conn.send(generate_error_response(412) + CRLF)
+                                    conn.send(generate_error_response(412, method) + CRLF)
                                     already_processed = True
                                     break
                             elif "None" in conditional:
                                 if not parse_if_match(uri, conditional_headers[conditional]):
                                     continue
                                 else:
-                                    conn.send(generate_error_response(304) + CRLF)
+                                    conn.send(generate_error_response(304, method) + CRLF)
                                     already_processed = True
                                     break
                             elif "Match" in conditional:
                                 if parse_if_match(uri, conditional_headers[conditional]):
                                     continue
                                 else:
-                                    conn.send(generate_error_response(412) + CRLF)
+                                    conn.send(generate_error_response(412, method) + CRLF)
                                     already_processed = True
                                     break
                         except ValueError:
@@ -429,63 +655,87 @@ def main(argv):
                             conn.close()
                             break
                         continue
+                    
                     # Handle OPTIONS execution
                     if method == "OPTIONS":
-                        conn.send(generate_error_response(200))
-                        conn.send(generate_allow() + CRLF)
+                        conn.send(generate_error_response(200, method))
                         write_to_log(addr[0], request_line, 200, uri)
                     # Handle HEAD execution
-                    elif method == "HEAD":
-                        if isdir(uri):
-                            if exists(uri + DEFAULTRESOURCE):
-                                uri = uri + DEFAULTRESOURCE
-                                conn.send(generate_status_code(200))
-                                conn.send(generate_success_response_headers(uri) + CRLF)
-                            else:
-                                conn.send(generate_directory_response(uri))
-                        else:
-                            conn.send(generate_status_code(200))
-                            conn.send(generate_success_response_headers(uri) + CRLF)
-                            write_to_log(addr[0], request_line, 200, uri)
+                    # elif method == "HEAD":
+                    #     if isdir(uri):
+                    #         if exists(uri + DEFAULTRESOURCE):
+                    #             uri = uri + DEFAULTRESOURCE
+                    #             conn.send(generate_status_code(200))
+                    #             conn.send(generate_success_response_headers(uri) + CRLF)
+                    #         else:
+                    #             conn.send(generate_directory_response(uri))
+                    #     else:
+                    #         conn.send(generate_status_code(200))
+                    #         conn.send(generate_success_response_headers(uri) + CRLF)
+                    #         write_to_log(addr[0], request_line, 200, uri)
                     # Handle GET execution
-                    elif method == "GET":
+                    elif method == "GET" or method == "HEAD":
                         if isdir(uri):
                             if exists(uri + DEFAULTRESOURCE):
                                 uri = uri + DEFAULTRESOURCE
                                 conn.send(generate_status_code(200))
                                 conn.send(generate_success_response_headers(uri) + CRLF)
-                                conn.send(generate_payload(uri))
+                                if method == "GET":
+                                    conn.send(generate_payload(uri))
                             else:
                                 conn.send(generate_directory_response(uri))
-                                conn.send(generate_directory_listing(uri))
+                                if method == "GET":
+                                    conn.send(generate_directory_listing(uri))
                         else:
-                            conn.send(generate_status_code(200))
-                            conn.send(generate_success_response_headers(uri) + CRLF)
-                            mime_type = generate_content_type(uri)
-                            conn.send(generate_payload(uri))
+                            if not byte_range:
+                                conn.send(generate_status_code(200))
+                                conn.send(generate_success_response_headers(uri) + CRLF)
+                                if method == "GET":
+                                    conn.send(generate_payload(uri))
+                            else:
+                                if len(byte_range) == 1:
+                                    content_range = byte_range[0]
+                                    payload = generate_payload(uri)[content_range:]
+                                    length = len(payload)
+                                    conn.send(generate_status_code(206))
+                                    conn.send(generate_success_response_headers(uri, length) + CRLF)
+                                    if method == "GET":
+                                        conn.send(payload)
+                                else:
+                                    content_range_lower, content_range_upper = byte_range
+                                    payload = generate_payload(uri)[content_range_lower:content_range_upper+1]
+                                    length = len(payload)
+                                    conn.send(generate_status_code(206))
+                                    content_range_lower = str(content_range_lower).encode('ascii')
+                                    content_range_upper = str(content_range_upper).encode('ascii')
+                                    file_size = os.path.getsize(uri)
+                                    conn.send(b'Content-Range: bytes ' + content_range_lower + b'-' + content_range_upper + b'/' + str(file_size).encode('ascii') + CRLF)
+                                    conn.send(generate_success_response_headers(uri, length) + CRLF)
+                                    if method == "GET":
+                                        conn.send(payload)
                             
                         write_to_log(addr[0], request_line, 200, uri)
                     if not keep_alive:
                         conn.close()
                         break
             except socket.timeout:
-                conn.send(generate_error_response(408) + CRLF)
+                conn.send(generate_error_response(408, "GET") + CRLF)
                 conn.close()
                 write_to_log(addr[0], b"", 408, b"")
                 break
             except Exception as e:
                 print(str(e))
                 sys.stderr.write(str(e))
-                conn.send(generate_error_response(500) + CRLF)
-                write_to_log(addr[0], request_line, 500, uri)
+                conn.send(generate_error_response(500, "GET") + CRLF)
+                # write_to_log(addr[0], request_line, 500, uri)
                 conn.send(str(e).encode('ascii'))
                 conn.close()
                 break
 
 
-    # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
-    # GET /indx.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\n
-    # HEAD /test2/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: bytes=-100\r\n\r\n
+    # GET /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
+    # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAccept-Charset: euc-jp; q=1.0, iso-2022-jp; q=0.0\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-Unmodified-Since: Sat, 01 Oct 2022 10:20:37 GMT\r\nConnection: close\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-None-Match: "49c11da52d38c0512fb8169340db16f3"\r\nConnection: close\r\n\r\n
