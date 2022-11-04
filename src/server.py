@@ -90,7 +90,7 @@ def split_accepts(header: bytes) -> list:
         if ';' not in option:
             value_pair.append(option)
         else:
-            print(option)
+            # print(option)
             attr, qval = option.split(';')
             qval = float(qval.split('q=')[1])
             value_pair.append(attr)
@@ -141,14 +141,21 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
             except IndexError:
                 print('index error happened')
                 continue
-            range_string = range_string.split('-')
-            if len(range_string) > 2:
-                continue
-            for num in range_string:
-                try:
-                    byte_range.append(int(num))
-                except:
+            print(len(list(filter(None, range_string.split('-')))))
+            if len(list(filter(None, range_string.split('-')))) != 1:
+                print('in split')
+                range_string = range_string.split('-')
+                if len(range_string) > 2:
                     continue
+                print(range_string)
+                for num in range_string:
+                    try:
+                        byte_range.append(int(num))
+                    except:
+                        continue
+            else:
+                byte_range.append(int(range_string))
+            print(byte_range)
             continue
         elif b'Accept' in header:
             try:
@@ -158,7 +165,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
                 print('index error happened')
                 continue
 
-    print(accept_headers)
+    # print(accept_headers)
     return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers)
 
 # Check if a method is currently supported
@@ -211,8 +218,8 @@ def check_if_multiple_reps(uri: str) -> list:
     possible_uris = listdir(directory_uri)
     existing_uris = []
     for possible_uri in possible_uris:
-        print(possible_uri)
-        print(resource)
+        # print(possible_uri)
+        # print(resource)
         if resource[1:] in possible_uri:
             existing_uris.append(possible_uri)
     return existing_uris
@@ -255,17 +262,16 @@ def parse_other_accepts(accept_pairs: list, possible_uris: list) -> str:
                     current_q_val = q_val
                     current_type = pair[0].strip()
                 elif q_val == current_q_val:
-                    current_q_val = 2.0
+                    return "multiple"
             else:
                 current_type = pair[0].strip()
                 current_q_val = 3.0
                 break
         if current_q_val == -1.0 or current_q_val == 0.0:
             return ""
-        elif current_q_val == 2.0:
-            return "multiple"
         else:
             return current_type
+    return ""
     
 
             
@@ -547,10 +553,10 @@ def main(argv):
                             for accept_header in accept_headers.keys():
                                 if accept_header == "Accept-Encoding":
                                     normalize_accept_encoding(accept_headers[accept_header]) 
-                                    print("Accept Headers :" + str(accept_headers[accept_header]))
+                                    # print("Accept Headers :" + str(accept_headers[accept_header]))
                                 elif accept_header == "Accept-Charset":
                                     normalize_accept_charset(accept_headers[accept_header])
-                                    print("Accept Headers :" + str(accept_headers[accept_header]))
+                                    # print("Accept Headers :" + str(accept_headers[accept_header]))
                                 if accept_header != "Accept":
                                     negotiation = parse_other_accepts(accept_headers[accept_header], potential_reps)
                                     if negotiation == "":
@@ -590,7 +596,7 @@ def main(argv):
                     already_processed = False
                     for conditional in conditional_headers.keys():
                         try:
-                            print(conditional)
+                            # print(conditional)
                             if "Modified" in conditional:
                                 if parse_if_modified_since(uri, conditional_headers[conditional]):
                                     continue
@@ -720,7 +726,7 @@ def main(argv):
                 break
 
 
-    # GET /caleb.jpeg HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: bytes=800-\r\n\r\n
+    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: bytes=-100\r\n\r\n
     # GET /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
     # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAccept-Charset: euc-jp; q=1.0, iso-2022-jp; q=0.0\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
