@@ -6,3 +6,5 @@ DEFAULTRESOURCE: index.html
 REDIRECTS: ./settings/redirects.cfg
 LANGUAGES: ./settings/languages.cfg
 CHARSETS: ./settings/charsets.cfg
+DIRECTORYPROTECT: WeMustProtectThisHouse!
+PRIVATEKEY: WoahAKey

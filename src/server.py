@@ -21,6 +21,8 @@ DEFAULTRESOURCE = config["DEFAULTRESOURCE"]
 REDIRECTFILE = config["REDIRECTS"]
 LANGUAGES = config["LANGUAGES"]
 CHARSETS = config["CHARSETS"]
+DIRECTORYPROTECT = config["DIRECTORYPROTECT"]
+PRIVATEKEY = config["PRIVATEKEY"]
 
 # Parse redirect regex config file
 with open(REDIRECTFILE, 'r') as f:
@@ -51,6 +53,7 @@ status_codes = {
     "302": b"302 Found",
     "304": b"304 Not Modified",
     "400": b"400 Bad Request",
+    "401": b'401 Unauthorized',
     "403": b"403 Forbidden",
     "404": b"404 Not Found",
     "406": b'406 Not Acceptable',
@@ -660,20 +663,6 @@ def main(argv):
                     if method == "OPTIONS":
                         conn.send(generate_error_response(200, method))
                         write_to_log(addr[0], request_line, 200, uri)
-                    # Handle HEAD execution
-                    # elif method == "HEAD":
-                    #     if isdir(uri):
-                    #         if exists(uri + DEFAULTRESOURCE):
-                    #             uri = uri + DEFAULTRESOURCE
-                    #             conn.send(generate_status_code(200))
-                    #             conn.send(generate_success_response_headers(uri) + CRLF)
-                    #         else:
-                    #             conn.send(generate_directory_response(uri))
-                    #     else:
-                    #         conn.send(generate_status_code(200))
-                    #         conn.send(generate_success_response_headers(uri) + CRLF)
-                    #         write_to_log(addr[0], request_line, 200, uri)
-                    # Handle GET execution
                     elif method == "GET" or method == "HEAD":
                         if isdir(uri):
                             if exists(uri + DEFAULTRESOURCE):
