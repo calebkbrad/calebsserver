@@ -101,6 +101,31 @@ def split_accepts(header: bytes) -> list:
         accept.append(value_pair)
     return accept
 
+# Given the path to an "auth" file, extract relevent information
+def parse_auth_file(path_to_auth: str) -> tuple:
+    with open(path_to_auth, 'r') as f:
+        contents = f.readlines()
+    contents = [contents for line in contents if line[0] != '#']
+
+    auth_type = ""
+    realm = ""
+    users = []
+    for line in contents:
+        if 'authorization-type' in line:
+            auth_type = line.split('=')[1]
+        elif 'realm' in line:
+            realm = line.split('=')[1]
+        else:
+            user = []
+            name, pw = line.split(':')
+            user.append(name)
+            user.append(pw)
+            users.append(user)
+    if auth_type and realm and users:
+        return (auth_type, realm, users)
+    return ()
+
+
 def validate_and_get_request_info(http_request: bytes) -> tuple:
     request_and_headers = http_request.split(CRLF)
     request = request_and_headers[0].decode('utf-8')
