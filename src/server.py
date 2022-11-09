@@ -103,18 +103,21 @@ def split_accepts(header: bytes) -> list:
 
 # Check if authentication is needed to access a resource. Return path to auth file if found
 def check_if_auth(uri: str) -> str:
-    raw_uri = uri.split(WEBROOT + '/')[1]
-    uri_components = raw_uri.split('/')
-    dir_to_check = "./"
+    uri_components = uri.split('/')[3:]
+    print(uri_components)
+    dir_to_check = WEBROOT
     found_uri = ""
-    if exists(dir_to_check + DIRECTORYPROTECT):
-        found_uri = dir_to_check + DIRECTORYPROTECT
+    if exists(dir_to_check +  '/' + DIRECTORYPROTECT):
+        found_uri = dir_to_check + '/' + DIRECTORYPROTECT
     for component in uri_components:
-        dir_to_check = dir_to_check + component
+        print("in loop")
+        dir_to_check = dir_to_check + '/' + component
+        print(dir_to_check)
         if not isdir(dir_to_check):
-            break
-        if exists(dir_to_check + DIRECTORYPROTECT):
-            found_uri = dir_to_check + DIRECTORYPROTECT
+            print('breaking')
+            continue
+        if exists(dir_to_check + '/' + DIRECTORYPROTECT):
+            found_uri = dir_to_check + '/' + DIRECTORYPROTECT
 
     return found_uri
 
@@ -123,12 +126,13 @@ def check_if_auth(uri: str) -> str:
 def parse_auth_file(path_to_auth: str) -> tuple:
     with open(path_to_auth, 'r') as f:
         contents = f.readlines()
-    contents = [contents for line in contents if line[0] != '#']
+    contents = [line.strip() for line in contents if '#' not in line]
 
     auth_type = ""
     realm = ""
     users = []
     for line in contents:
+        print(line)
         if 'authorization-type' in line:
             auth_type = line.split('=')[1]
         elif 'realm' in line:
@@ -142,7 +146,6 @@ def parse_auth_file(path_to_auth: str) -> tuple:
     if auth_type and realm and users:
         return (auth_type, realm, users)
     return ()
-
 
 def validate_and_get_request_info(http_request: bytes) -> tuple:
     request_and_headers = http_request.split(CRLF)
@@ -273,10 +276,6 @@ def check_if_multiple_reps(uri: str) -> list:
             existing_uris.append(possible_uri)
     return existing_uris
 
-# def parse_accept(accept_pairs: list) -> str:
-#     negotiated_uri = ""
-#     for mime_type in accept_pairs:
-
 def normalize_accept_encoding(accept_pairs: list):
     for pair in accept_pairs:
         if pair[0].strip() == "gzip":
@@ -322,9 +321,6 @@ def parse_other_accepts(accept_pairs: list, possible_uris: list) -> str:
             return current_type
     return ""
     
-
-            
-
 # Given a dictionary of accepts, determines the uri with the highest q value (if applicable)
 def parse_accepts(accept_dict: dict, uri: str) -> str:
     possible_uris = check_if_multiple_reps(uri)
@@ -467,6 +463,17 @@ def generate_redirect_headers(redirect_uri: str, status_code: int):
     headers += generate_error_payload(status_code)
     return headers + CRLF
 
+def generate_unauthorized_response(auth_uri: str, uri: str, method: str) -> bytes:
+    auth_type, realm, users = parse_auth_file(auth_uri)
+    full_response = generate_status_code(401)
+    full_response += generate_date_header()
+    full_response += generate_server()
+    full_response += b'WWW-Authenticate: ' + auth_type.encode('ascii') + b' realm=' + realm.encode('ascii') + CRLF
+    full_response += generate_content_type(uri) + CRLF
+    if method == "GET":
+        full_response += generate_error_payload(401)
+    return full_response
+
 # Check if a resource exists, given a normalized uri (relative path)
 def check_resource(uri: str) -> bool:
     return exists(uri)
@@ -559,6 +566,8 @@ def main(argv):
                         conn.close()
                         print(str(e))
                         break
+                    
+                    print(check_if_auth(uri))
 
                     request_line = data.split(CRLF)[0]
                     # Handle TRACE execution
@@ -586,6 +595,14 @@ def main(argv):
                             break
                         continue
                     
+                    auth_file = check_if_auth(uri)
+                    if auth_file:
+                        conn.send(generate_unauthorized_response(auth_file, uri, method))
+                        if not keep_alive:
+                            conn.close()
+                            break
+                        continue
+
                     
                     if uri in virtual_uris.keys():
                         conn.send(generate_status_code(200))
@@ -767,7 +784,7 @@ def main(argv):
                 break
 
 
-    # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: bytes=-100\r\n\r\n
+    # GET /authtest/nested/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
     # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAccept-Charset: euc-jp; q=1.0, iso-2022-jp; q=0.0\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
