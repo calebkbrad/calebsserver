@@ -101,6 +101,24 @@ def split_accepts(header: bytes) -> list:
         accept.append(value_pair)
     return accept
 
+# Check if authentication is needed to access a resource. Return path to auth file if found
+def check_if_auth(uri: str) -> str:
+    raw_uri = uri.split(WEBROOT + '/')[1]
+    uri_components = raw_uri.split('/')
+    dir_to_check = "./"
+    found_uri = ""
+    if exists(dir_to_check + DIRECTORYPROTECT):
+        found_uri = dir_to_check + DIRECTORYPROTECT
+    for component in uri_components:
+        dir_to_check = dir_to_check + component
+        if not isdir(dir_to_check):
+            break
+        if exists(dir_to_check + DIRECTORYPROTECT):
+            found_uri = dir_to_check + DIRECTORYPROTECT
+
+    return found_uri
+
+
 # Given the path to an "auth" file, extract relevent information
 def parse_auth_file(path_to_auth: str) -> tuple:
     with open(path_to_auth, 'r') as f:
@@ -567,6 +585,8 @@ def main(argv):
                             conn.close()
                             break
                         continue
+                    
+                    
                     if uri in virtual_uris.keys():
                         conn.send(generate_status_code(200))
                         conn.send(generate_success_response_headers(virtual_uris[uri]) + CRLF)
