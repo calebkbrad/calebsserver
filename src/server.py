@@ -612,7 +612,7 @@ def main(argv):
                         if "Basic" in auth_type:
                             authorized = False
                             for credential in credentials:
-                                if base64.base64encode(credential.encode('ascii')) == auth:
+                                if base64.b64encode(credential.encode('ascii')) == auth:
                                     authorized = True
                                     break
                             if not authorized:
