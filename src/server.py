@@ -608,7 +608,7 @@ def main(argv):
                             break
                         continue
                     elif auth_file and auth:
-                        auth_type, realm, credentials = parse_auth_file(path_to_auth)
+                        auth_type, realm, credentials = parse_auth_file(auth_file)
                         if "Basic" in auth_type:
                             authorized = False
                             for credential in credentials:
