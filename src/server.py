@@ -610,7 +610,7 @@ def main(argv):
                             authorized = False
                             for credential in credentials:
                                 conn.send(b'Auth from file = ' + credential.encode('ascii') + CRLF)
-                                if base64.b64encode(credential.encode('ascii')) == base64.b64decode(auth):
+                                if credential.encode('ascii') == base64.b64decode(auth):
                                     authorized = True
                                     break
                             if not authorized:
