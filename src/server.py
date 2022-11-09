@@ -605,12 +605,12 @@ def main(argv):
                         continue
                     elif auth_file and auth:
                         auth_type, realm, credentials = parse_auth_file(auth_file)
-                        conn.send(b'Auth from header = ' + auth + CRLF)
+                        conn.send(b'Auth from header = ' + base64.b64decode(auth) + CRLF)
                         if "Basic" in auth_type:
                             authorized = False
                             for credential in credentials:
-                                conn.send(b'Auth from file = ' + base64.b64encode(credential.encode('ascii')) + CRLF)
-                                if base64.b64encode(credential.encode('ascii')) == auth:
+                                conn.send(b'Auth from file = ' + credential.encode('ascii') + CRLF)
+                                if base64.b64encode(credential.encode('ascii')) == base64.b64decode(auth):
                                     authorized = True
                                     break
                             if not authorized:
