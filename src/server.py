@@ -9,6 +9,7 @@ import os
 import yaml
 import string
 import hashlib
+import base64
 from urllib.parse import unquote
 
 CRLF = b'\r\n'
@@ -183,6 +184,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
 
     byte_range = []
     accept_headers = {}
+    auth = b''
     for header in headers:
         if b'Range:' in header:
             try:
@@ -213,6 +215,11 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
             except IndexError:
                 print('index error happened')
                 continue
+        elif b'Authorization:' in header:
+            if b'Basic' in header:
+                auth = header.split(b'Basic')[1].decode('utf-8').strip().encode('ascii').b64encode()
+
+
 
     # print(accept_headers)
     return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers)
@@ -469,7 +476,7 @@ def generate_unauthorized_response(auth_uri: str, uri: str, method: str) -> byte
     full_response += generate_date_header()
     full_response += generate_server()
     full_response += b'WWW-Authenticate: ' + auth_type.encode('ascii') + b' realm=' + realm.encode('ascii') + CRLF
-    full_response += b'Content-Type: text/html'
+    full_response += b'Content-Type: text/html' + CRLF
     if method == "GET":
         full_response += generate_error_payload(401)
     return full_response
