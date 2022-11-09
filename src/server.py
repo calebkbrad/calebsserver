@@ -476,7 +476,7 @@ def generate_unauthorized_response(auth_uri: str, uri: str, method: str) -> byte
     full_response += generate_date_header()
     full_response += generate_server()
     full_response += b'WWW-Authenticate: ' + auth_type.encode('ascii') + b' realm=' + realm.encode('ascii') + CRLF
-    full_response += b'Content-Type: text/html' + CRLF
+    full_response += b'Content-Type: text/html' + CRLFCRLF
     if method == "GET":
         full_response += generate_error_payload(401)
     return full_response
