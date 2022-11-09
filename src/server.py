@@ -469,7 +469,7 @@ def generate_unauthorized_response(auth_uri: str, uri: str, method: str) -> byte
     full_response += generate_date_header()
     full_response += generate_server()
     full_response += b'WWW-Authenticate: ' + auth_type.encode('ascii') + b' realm=' + realm.encode('ascii') + CRLF
-    full_response += generate_content_type(uri) + CRLF
+    full_response += b'Content-Type: text/html'
     if method == "GET":
         full_response += generate_error_payload(401)
     return full_response
@@ -784,7 +784,7 @@ def main(argv):
                 break
 
 
-    # GET /authtest/nested/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
     # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAccept-Charset: euc-jp; q=1.0, iso-2022-jp; q=0.0\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
