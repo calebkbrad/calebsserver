@@ -139,11 +139,7 @@ def parse_auth_file(path_to_auth: str) -> tuple:
         elif 'realm' in line:
             realm = line.split('=')[1]
         else:
-            user = []
-            name, pw = line.split(':')
-            user.append(name)
-            user.append(pw)
-            users.append(user)
+            users.append(line)
     if auth_type and realm and users:
         return (auth_type, realm, users)
     return ()
