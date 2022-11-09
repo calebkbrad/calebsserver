@@ -574,8 +574,6 @@ def main(argv):
                         print(str(e))
                         break
                     
-                    print(check_if_auth(uri))
-
                     request_line = data.split(CRLF)[0]
                     # Handle TRACE execution
                     if method == "TRACE":
@@ -603,12 +601,28 @@ def main(argv):
                         continue
                     
                     auth_file = check_if_auth(uri)
-                    if auth_file:
+                    if auth_file and not auth:
                         conn.send(generate_unauthorized_response(auth_file, uri, method))
                         if not keep_alive:
                             conn.close()
                             break
                         continue
+                    elif auth_file and auth:
+                        auth_type, realm, credentials = parse_auth_file(path_to_auth)
+                        if "Basic" in auth_type:
+                            authorized = False
+                            for credential in credentials:
+                                if base64.base64encode(credential.encode('ascii')) == auth:
+                                    authorized = True
+                                    break
+                            if not authorized:
+                                conn.send(generate_unauthorized_response(auth_file, uri, method))
+                                if not keep_alive:
+                                    conn.close()
+                                    break
+                                continue
+                            
+
 
                     
                     if uri in virtual_uris.keys():
