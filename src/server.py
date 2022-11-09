@@ -216,13 +216,13 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
                 print('index error happened')
                 continue
         elif b'Authorization:' in header:
+            print("detected auth header")
             if b'Basic' in header:
-                auth = header.split(b'Basic')[1].decode('utf-8').strip().encode('ascii').b64encode()
-
-
+                print('its basic')
+                auth = header.split(b'Basic')[1].decode('utf-8').strip().encode('ascii')
 
     # print(accept_headers)
-    return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers)
+    return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers, auth)
 
 # Check if a method is currently supported
 def check_method(method: str) -> bool:
@@ -566,7 +566,7 @@ def main(argv):
         
                 for request in requests:   
                     try:
-                        method, uri, version, headers, keep_alive, byte_range, accept_headers = validate_and_get_request_info(request)
+                        method, uri, version, headers, keep_alive, byte_range, accept_headers, auth = validate_and_get_request_info(request)
                     except ValueError as e:
                         conn.send(generate_error_response(400, "GET"))
                         conn.send(str(e).encode('ascii'))
@@ -791,7 +791,7 @@ def main(argv):
                 break
 
 
-    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # GET /authtest/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Basic YmRhOm1sbg==\r\n\r\n
     # GET /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
     # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAccept-Charset: euc-jp; q=1.0, iso-2022-jp; q=0.0\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
