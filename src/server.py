@@ -608,9 +608,12 @@ def main(argv):
                         conn.send(b'Auth from header = ' + base64.b64decode(auth) + CRLF)
                         if "Basic" in auth_type:
                             authorized = False
+                            user, pw = auth.split(':')
+                            encrypted = hashlib.md5(pw.encode('ascii')).hexdigest()
+                            auth_credential = user + ':' + encrypted
                             for credential in credentials:
                                 conn.send(b'Auth from file = ' + credential.encode('ascii') + CRLF)
-                                if credential.encode('ascii') == base64.b64decode(auth):
+                                if auth_credential == credential:
                                     authorized = True
                                     break
                             if not authorized:
