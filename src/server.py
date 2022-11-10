@@ -605,13 +605,18 @@ def main(argv):
                             break
                         continue
                     elif auth_file and auth:
+                        print('checking auth')
                         auth_type, realm, credentials = parse_auth_file(auth_file)
+                        print('done checking auth')
                         # conn.send(b'Auth from header = ' + base64.b64decode(auth) + CRLF)
                         if "Basic" in auth_type:
+                            print(auth)
                             authorized = False
-                            user, pw = auth.split(':')
-                            encrypted = hashlib.md5(pw.encode('ascii')).hexdigest().encode('ascii')
-                            auth_credential = user + ':' + encrypted
+                            user, pw = auth.split(b':')
+                            print('before hash')
+                            encrypted = hashlib.md5(pw).hexdigest().encode('ascii')
+                            print('after hash')
+                            auth_credential = user + b':' + encrypted
                             for credential in credentials:
                                 # conn.send(b'Auth from file = ' + credential.encode('ascii') + CRLF)
                                 if auth_credential == credential:
