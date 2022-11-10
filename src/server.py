@@ -212,7 +212,8 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
                 print('index error happened')
                 continue
         elif b'Authorization:' in header:
-            print("detected auth header")
+            if auth:
+                return ()
             if b'Basic' in header:
                 print('its basic')
                 auth = header.split(b'Basic')[1].decode('utf-8').strip().encode('ascii')
