@@ -216,6 +216,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
             if b'Basic' in header:
                 print('its basic')
                 auth = header.split(b'Basic')[1].decode('utf-8').strip().encode('ascii')
+                auth = base64.b64decode(auth)
 
     # print(accept_headers)
     return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers, auth)
@@ -609,7 +610,7 @@ def main(argv):
                         if "Basic" in auth_type:
                             authorized = False
                             user, pw = auth.split(':')
-                            encrypted = hashlib.md5(pw.encode('ascii')).hexdigest()
+                            encrypted = hashlib.md5(pw.encode('ascii')).hexdigest().encode('ascii')
                             auth_credential = user + ':' + encrypted
                             for credential in credentials:
                                 # conn.send(b'Auth from file = ' + credential.encode('ascii') + CRLF)
