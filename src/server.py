@@ -610,16 +610,13 @@ def main(argv):
                         print('done checking auth')
                         # conn.send(b'Auth from header = ' + base64.b64decode(auth) + CRLF)
                         if "Basic" in auth_type:
-                            print(auth)
                             authorized = False
                             user, pw = auth.split(b':')
-                            print('before hash')
                             encrypted = hashlib.md5(pw).hexdigest().encode('ascii')
-                            print('after hash')
                             auth_credential = user + b':' + encrypted
                             for credential in credentials:
                                 # conn.send(b'Auth from file = ' + credential.encode('ascii') + CRLF)
-                                if auth_credential == credential:
+                                if auth_credential == credential.encode('ascii'):
                                     authorized = True
                                     break
                             if not authorized:
@@ -812,7 +809,7 @@ def main(argv):
                 break
 
 
-    # GET /authtest/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Basic YmRhOm1sbg==\r\n\r\n
+    # GET /authtest/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Basic YmRhOmJkYQ==\r\n\r\n
     # GET /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
     # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAccept-Charset: euc-jp; q=1.0, iso-2022-jp; q=0.0\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
