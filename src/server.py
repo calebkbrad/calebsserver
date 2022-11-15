@@ -231,11 +231,10 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     # print(accept_headers)
     return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers, auth)
 
-def check_digest_auth(auth_digest: dict, auth_file: str, conn) -> bool:
+def check_digest_auth(auth_digest: dict, auth_file: str) -> bool:
     auth_type, realm, credentials = parse_auth_file(auth_file)
 
     for detail in auth_digest.keys():
-        conn.send(auth_digest[detail].encode('ascii') + CRLF)
         if 'realm' in detail:
             if realm in auth_digest[detail]:
                 continue
@@ -247,9 +246,7 @@ def check_digest_auth(auth_digest: dict, auth_file: str, conn) -> bool:
         elif 'username' in detail:
             verified = False
             for credential in credentials:
-                conn.send(credential.encode('ascii') + CRLF)
                 if auth_digest[detail][1:-1] in credential:
-                    conn.send(b'passed' + CRLF)
                     verified = True
                     break
             if verified:
@@ -669,11 +666,6 @@ def main(argv):
                                     break
                                 continue
                             
-
-                            
-
-
-                    
                     if uri in virtual_uris.keys():
                         conn.send(generate_status_code(200))
                         conn.send(generate_success_response_headers(virtual_uris[uri]) + CRLF)
