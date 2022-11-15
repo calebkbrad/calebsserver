@@ -226,6 +226,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
                     key, value = detail.split('=')
                     digest_auth.update({key: value})
                 print(digest_auth)
+                auth = digest_auth
 
     # print(accept_headers)
     return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers, auth)
@@ -654,10 +655,12 @@ def main(argv):
                                     break
                                 continue
                         elif 'Digest' in auth_type:
-                            authorized = False
-                            user, user_realm, pw = auth.split(b':')
-                            encrypted = hashlib.md5(pw).hexdigest().encode('ascii')
-                            auth_credential = user + b':' + user_realm + b':' + encrypted
+                            if not check_digest_auth(auth, auth_file):
+                                conn.send(generate_unauthorized_response(auth_file, uri, method))
+                                if not keep_alive:
+                                    conn.close()
+                                    break
+                                continue
                             
 
                             
