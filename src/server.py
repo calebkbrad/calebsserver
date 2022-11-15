@@ -231,9 +231,10 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     # print(accept_headers)
     return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers, auth)
 
-def check_digest_auth(auth_digest: dict, auth_file: str) -> bool:
+def check_digest_auth(auth_digest: dict, auth_file: str, conn) -> bool:
     auth_type, realm, credentials = parse_auth_file(auth_file)
     for detail in auth_digest.keys():
+        conn.send(auth_digest[detail].encode('ascii') + CRLF)
         if 'realm' in detail:
             if realm in auth_digest[detail]:
                 continue
@@ -655,7 +656,7 @@ def main(argv):
                                     break
                                 continue
                         elif 'Digest' in auth_type:
-                            if not check_digest_auth(auth, auth_file):
+                            if not check_digest_auth(auth, auth_file, conn):
                                 conn.send(generate_unauthorized_response(auth_file, uri, method))
                                 if not keep_alive:
                                     conn.close()
