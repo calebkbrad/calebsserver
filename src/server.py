@@ -235,7 +235,7 @@ def check_digest_auth(auth_digest: dict, auth_file: str, conn) -> bool:
     auth_type, realm, credentials = parse_auth_file(auth_file)
 
     for detail in auth_digest.keys():
-        conn.send(auth_digest[detail][1:-1].encode('ascii') + CRLF)
+        conn.send(auth_digest[detail].encode('ascii') + CRLF)
         if 'realm' in detail:
             if realm in auth_digest[detail]:
                 continue
