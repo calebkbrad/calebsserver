@@ -245,12 +245,15 @@ def check_digest_auth(auth_digest: dict, auth_file: str, conn) -> bool:
                 continue
             return False
         elif 'username' in detail:
+            verified = False
             for credential in credentials:
                 conn.send(credential.encode('ascii') + CRLF)
                 if auth_digest[detail][1:-1] in credential:
                     conn.send(b'passed' + CRLF)
-                    continue
-            conn.send(b'failed' + CRLF)
+                    verified = True
+                    break
+            if verified:
+                continue
             return False
     return True
 
