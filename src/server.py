@@ -105,7 +105,7 @@ def split_accepts(header: bytes) -> list:
 # Check if authentication is needed to access a resource. Return path to auth file if found
 def check_if_auth(uri: str) -> str:
     uri_components = uri.split('/')[3:]
-    print(uri_components)
+    # print(uri_components)
     dir_to_check = WEBROOT
     found_uri = ""
     if exists(dir_to_check +  '/' + DIRECTORYPROTECT):
@@ -133,7 +133,7 @@ def parse_auth_file(path_to_auth: str) -> tuple:
     realm = ""
     users = []
     for line in contents:
-        print(line)
+        # print(line)
         if 'authorization-type' in line:
             auth_type = line.split('=')[1]
         elif 'realm' in line:
@@ -215,12 +215,39 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
             if auth:
                 return ()
             if b'Basic' in header:
-                print('its basic')
                 auth = header.split(b'Basic')[1].decode('utf-8').strip().encode('ascii')
                 auth = base64.b64decode(auth)
+            elif b'Digest' in header:
+                print('checking digest header')
+                auth = header.split(b'Digest')[1].decode('utf-8').strip()
+                digest_auth = {}
+                auth_details = auth.split(',')
+                for detail in auth_details:
+                    key, value = detail.split('=')
+                    digest_auth.update({key: value})
+                print(digest_auth)
 
     # print(accept_headers)
     return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers, auth)
+
+def check_digest_auth(auth_digest: dict, auth_file: str) -> bool:
+    auth_type, realm, credentials = parse_auth_file(auth_file)
+    for detail in auth_digest.keys():
+        if 'realm' in detail:
+            if realm in auth_digest[detail]:
+                continue
+            return False
+        elif 'nc' in detail:
+            if '00000001' in auth_digest[detail]:
+                continue
+            return False
+        elif 'username' in detail:
+            for credential in credentials:
+                if auth_digest[detail] in credential:
+                    continue
+            return False
+
+    return True
 
 # Check if a method is currently supported
 def check_method(method: str) -> bool:
@@ -606,9 +633,9 @@ def main(argv):
                             break
                         continue
                     elif auth_file and auth:
-                        print('checking auth')
+                        # print('checking auth')
                         auth_type, realm, credentials = parse_auth_file(auth_file)
-                        print('done checking auth')
+                        # print('done checking auth')
                         # conn.send(b'Auth from header = ' + base64.b64decode(auth) + CRLF)
                         if "Basic" in auth_type:
                             authorized = False
@@ -626,6 +653,13 @@ def main(argv):
                                     conn.close()
                                     break
                                 continue
+                        elif 'Digest' in auth_type:
+                            authorized = False
+                            user, user_realm, pw = auth.split(b':')
+                            encrypted = hashlib.md5(pw).hexdigest().encode('ascii')
+                            auth_credential = user + b':' + user_realm + b':' + encrypted
+                            
+
                             
 
 
@@ -810,7 +844,7 @@ def main(argv):
                 break
 
 
-    # GET /authtest/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Basic YmRhOmJkYQ==\r\n\r\n
+    # GET /authtest/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Digest username="mln", realm="ColonialPlace", uri="http://cs531-cs_cbrad022/a4-test/limited2/foo/bar.txt", qop=auth, nonce="", nc=00000001, cnonce="014a54548c61ba03827ef6a4dc2f7b4c", response="3ce1d37ec34ae93229df35e6a5c1358e"\r\n\r\n
     # GET /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
     # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAccept-Charset: euc-jp; q=1.0, iso-2022-jp; q=0.0\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
