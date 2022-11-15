@@ -240,7 +240,7 @@ def check_digest_auth(auth_digest: dict, auth_file: str, conn) -> bool:
             if realm in auth_digest[detail]:
                 continue
             return False
-        elif 'nc' in detail:
+        elif detail == ' nc':
             if '00000001' in auth_digest[detail]:
                 continue
             return False
