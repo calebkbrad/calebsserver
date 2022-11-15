@@ -245,7 +245,7 @@ def check_digest_auth(auth_digest: dict, auth_file: str, conn) -> bool:
             return False
         elif 'username' in detail:
             for credential in credentials:
-                if credential in auth_digest[detail]:
+                if auth_digest[detail][1:-1] in credential:
                     continue
             return False
 
