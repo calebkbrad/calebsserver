@@ -239,15 +239,21 @@ def generate_digest_response(auth_digest: dict, credential: str, method: str, ur
     qop = auth_digest[' qop']
     a1 = credential
     a2 = f'{method}:{uri}'
+    print(credential)
+    print(realm)
+    print(nonce)
+    print(ncount)
+    print(cnonce)
+    print(qop)
+    print(a2)
 
-    hashed_a1 = hashlib.md5(a1.encode('ascii'))
-    hashed_a2 = hashlib.md5(a2.encode('ascii'))
+    hashed_a1 = hashlib.md5(a1.encode('ascii')).hexdigest()
+    hashed_a2 = hashlib.md5(a2.encode('ascii')).hexdigest()
     prehashed_digest = f'{hashed_a1}:{nonce}:{ncount}:{cnonce}:{qop}:{hashed_a2}'
-    hashed_digest = hashlib.md5(prehashed_digest.encode('ascii'))
+    print(prehashed_digest)
+    hashed_digest = hashlib.md5(prehashed_digest.encode('ascii')).hexdigest()
+    print(hashed_digest)
     return hashed_digest
-
-
-
 
 def check_digest_auth(auth_digest: dict, auth_file: str, method: str, uri: str) -> bool:
     auth_type, realm, credentials = parse_auth_file(auth_file)
