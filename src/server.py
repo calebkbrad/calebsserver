@@ -240,10 +240,10 @@ def generate_digest_response(auth_digest: dict, credential: str, method: str, ur
     a1 = credential
     a2 = f'{method}:{uri}'
 
-    hashed_a1 = hashlib.md5(a1)
-    hashed_a2 = hashlib.md5(a2)
+    hashed_a1 = hashlib.md5(a1.encode('ascii'))
+    hashed_a2 = hashlib.md5(a2.encode('ascii'))
     prehashed_digest = f'{hashed_a1}:{nonce}:{ncount}:{cnonce}:{qop}:{hashed_a2}'
-    hashed_digest = hashlib.md5(prehashed_digest)
+    hashed_digest = hashlib.md5(prehashed_digest.encode('ascii'))
     return hashed_digest
 
 
@@ -251,7 +251,6 @@ def generate_digest_response(auth_digest: dict, credential: str, method: str, ur
 
 def check_digest_auth(auth_digest: dict, auth_file: str, method: str, uri: str) -> bool:
     auth_type, realm, credentials = parse_auth_file(auth_file)
-
     user_credential = ""
     for detail in auth_digest.keys():
         if 'realm' in detail:
@@ -271,7 +270,10 @@ def check_digest_auth(auth_digest: dict, auth_file: str, method: str, uri: str) 
             if user_credential:
                 continue
             return False
-    return True
+    response = auth_digest[' response'][1:-1]
+    if generate_digest_response(auth_digest, credential, method, uri) == response:
+        return True
+    return False
 
 # Check if a method is currently supported
 def check_method(method: str) -> bool:
@@ -678,7 +680,7 @@ def main(argv):
                                     break
                                 continue
                         elif 'Digest' in auth_type:
-                            if not check_digest_auth(auth, auth_file):
+                            if not check_digest_auth(auth, auth_file, method, uri):
                                 conn.send(generate_unauthorized_response(auth_file, uri, method))
                                 if not keep_alive:
                                     conn.close()
@@ -865,7 +867,7 @@ def main(argv):
                 break
 
 
-    # GET /authtest/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Digest username="mln", realm="ColonialPlace", uri="http://cs531-cs_cbrad022/a4-test/limited2/foo/bar.txt", qop=auth, nonce="", nc=00000001, cnonce="014a54548c61ba03827ef6a4dc2f7b4c", response="3ce1d37ec34ae93229df35e6a5c1358e"\r\n\r\n
+    # GET /nested2/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Digest username="mln", realm="Colonial Place", uri="http://cs531-cs_cbrad022/a4-test/limited2/foo/bar.txt", qop=auth, nonce="", nc=00000001, cnonce="014a54548c61ba03827ef6a4dc2f7b4c", response="3ce1d37ec34ae93229df35e6a5c1358e"\r\n\r\n
     # GET /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
     # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAccept-Charset: euc-jp; q=1.0, iso-2022-jp; q=0.0\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
