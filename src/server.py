@@ -122,7 +122,6 @@ def check_if_auth(uri: str) -> str:
 
     return found_uri
 
-
 # Given the path to an "auth" file, extract relevent information
 def parse_auth_file(path_to_auth: str) -> tuple:
     with open(path_to_auth, 'r') as f:
@@ -231,9 +230,29 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     # print(accept_headers)
     return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers, auth)
 
-def check_digest_auth(auth_digest: dict, auth_file: str) -> bool:
+def generate_digest_response(auth_digest: dict, credential: str, method: str, uri: str) -> bytes:
+    username = auth_digest['username'][1:-1]
+    realm = auth_digest[' realm'][1:-1]
+    nonce = auth_digest[' nonce'][1:-1]
+    ncount = auth_digest[' nc']
+    cnonce = auth_digest[' cnonce'][1:-1]
+    qop = auth_digest[' qop']
+    a1 = credential
+    a2 = f'{method}:{uri}'
+
+    hashed_a1 = hashlib.md5(a1)
+    hashed_a2 = hashlib.md5(a2)
+    prehashed_digest = f'{hashed_a1}:{nonce}:{ncount}:{cnonce}:{qop}:{hashed_a2}'
+    hashed_digest = hashlib.md5(prehashed_digest)
+    return hashed_digest
+
+
+
+
+def check_digest_auth(auth_digest: dict, auth_file: str, method: str, uri: str) -> bool:
     auth_type, realm, credentials = parse_auth_file(auth_file)
 
+    user_credential = ""
     for detail in auth_digest.keys():
         if 'realm' in detail:
             if realm in auth_digest[detail]:
@@ -247,9 +266,9 @@ def check_digest_auth(auth_digest: dict, auth_file: str) -> bool:
             verified = False
             for credential in credentials:
                 if auth_digest[detail][1:-1] in credential:
-                    verified = True
+                    user_credential = credential
                     break
-            if verified:
+            if user_credential:
                 continue
             return False
     return True
