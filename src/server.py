@@ -23,7 +23,7 @@ REDIRECTFILE = config["REDIRECTS"]
 LANGUAGES = config["LANGUAGES"]
 CHARSETS = config["CHARSETS"]
 DIRECTORYPROTECT = config["DIRECTORYPROTECT"]
-PRIVATEKEY = config["PRIVATEKEY"]
+PRIVATEKEY = config["PRIVATEKEY"].encode('ascii')
 
 # Parse redirect regex config file
 with open(REDIRECTFILE, 'r') as f:
@@ -286,14 +286,20 @@ def check_method(method: str) -> bool:
 def check_version(http_version: str) -> bool:
     return http_version == "HTTP/1.1"
 
-
-# Generate an etag using md5
-def generate_etag(valid_uri: str) -> bytes:
+def generate_etag(valid_uri):
     hash_md5 = hashlib.md5()
     with open(valid_uri, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
-    return b'ETag: "' + hash_md5.hexdigest().encode('ascii') + b'"' + CRLF
+    return hash_md5.hexdigest().encode('ascii')
+
+# Generate an etag using md5
+def generate_etag_header(valid_uri: str) -> bytes:
+    hash_md5 = hashlib.md5()
+    with open(valid_uri, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return b'ETag: "' + generate_etag(valid_uri) + b'"' + CRLF
 
 # Get all conditional headers from list of headers
 def get_conditionals(headers: list) -> list:
@@ -315,7 +321,7 @@ def parse_if_modified_since(valid_uri: str, conditional_time: str) -> bool:
     return last_m_time >= parsed_conditional_time
 
 def parse_if_match(valid_uri: str, etag: str):
-    uri_etag = generate_etag(valid_uri)[6:-2]
+    uri_etag = generate_etag_header(valid_uri)[6:-2]
     etag_bytes = etag.encode('ascii')
     
     return etag_bytes == uri_etag
@@ -503,7 +509,7 @@ def generate_success_response_headers(uri: str, length=0) -> bytes:
     else:
         bytes_length = str(length).encode('ascii')
         headers += b'Content-Length: ' + bytes_length + CRLF
-    headers += generate_etag(uri)
+    headers += generate_etag_header(uri)
     return headers
 
 # Generate location header given the proper uri for a redirect
@@ -529,8 +535,28 @@ def generate_unauthorized_response(auth_uri: str, uri: str, method: str) -> byte
     full_response = generate_status_code(401)
     full_response += generate_date_header()
     full_response += generate_server()
-    full_response += b'WWW-Authenticate: ' + auth_type.encode('ascii') + b' realm=' + realm.encode('ascii') + CRLF
-    full_response += b'Content-Type: text/html' + CRLFCRLF
+    if 'Basic' in auth_type:
+        full_response += b'WWW-Authenticate: ' + auth_type.encode('ascii') + b' realm=' + realm.encode('ascii') + CRLF
+        full_response += b'Content-Type: text/html' + CRLFCRLF
+    elif 'Digest' in auth_type:
+        etag = generate_etag(uri)
+        time_stamp = generate_date_header()
+        to_hash = time_stamp + b':' + etag + b':' + PRIVATEKEY
+        hashed_nonce = hashlib.md5(to_hash).hexdigest().encode('ascii')
+        to_encode_nonce = time_stamp + b' ' + hashed_nonce
+        nonce = base64.b64encode(to_encode_nonce)
+
+        opaque_to_hash = uri.encode('ascii') + b':' + PRIVATEKEY
+        opaque = hashlib.md5(opaque_to_hash).hexdigest().encode('ascii')
+
+        full_response += b'WWW-Authenticate: Digest realm=' + realm.encode('ascii') + b', '
+        full_response += b'domain="' + uri.encode('ascii') + b'", '
+        full_response += b'qop="auth", '
+        full_response += b'nonce="' + nonce + b'", '
+        full_response += b'algorithm="MD5", '
+        full_response += b'opaque="' + opaque +b'"' + CRLF
+        full_response += b'Content-Type: text/html' + CRLFCRLF
+
     if method == "GET":
         full_response += generate_error_payload(401)
     return full_response
@@ -538,6 +564,7 @@ def generate_unauthorized_response(auth_uri: str, uri: str, method: str) -> byte
 # Check if a resource exists, given a normalized uri (relative path)
 def check_resource(uri: str) -> bool:
     return exists(uri)
+
 def generate_directory_listing(directory_uri: str) -> bytes:
     list_table_elements = []
     for f in listdir(directory_uri):
@@ -871,6 +898,7 @@ def main(argv):
 
 
     # GET /nested2/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Digest username="mln", realm="Colonial Place", uri="http://cs531-cs_cbrad022/a4-test/limited2/foo/bar.txt", qop=auth, nonce="", nc=00000001, cnonce="014a54548c61ba03827ef6a4dc2f7b4c", response="3ce1d37ec34ae93229df35e6a5c1358e"\r\n\r\n
+    # GET /nested2/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
     # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAccept-Charset: euc-jp; q=1.0, iso-2022-jp; q=0.0\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
