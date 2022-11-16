@@ -255,16 +255,12 @@ def generate_digest_response(auth_digest: dict, credential: str, method: str, ur
     print(hashed_digest)
     return hashed_digest
 
-def check_digest_auth(auth_digest: dict, auth_file: str, method: str, uri: str) -> bool:
+def check_digest_auth(auth_digest: dict, auth_file: str, method: str, uri: str, conn) -> bool:
     auth_type, realm, credentials = parse_auth_file(auth_file)
     user_credential = ""
     for detail in auth_digest.keys():
         if 'realm' in detail:
             if realm in auth_digest[detail]:
-                continue
-            return False
-        elif detail == ' nc':
-            if '00000001' in auth_digest[detail]:
                 continue
             return False
         elif 'username' in detail:
@@ -277,6 +273,7 @@ def check_digest_auth(auth_digest: dict, auth_file: str, method: str, uri: str) 
                 continue
             return False
     response = auth_digest[' response'][1:-1]
+    conn.send(generate_digest_response(auth_digest, credential, method, uri).encode('ascii'))
     if generate_digest_response(auth_digest, credential, method, uri) == response:
         return True
     return False
@@ -686,7 +683,7 @@ def main(argv):
                                     break
                                 continue
                         elif 'Digest' in auth_type:
-                            if not check_digest_auth(auth, auth_file, method, uri):
+                            if not check_digest_auth(auth, auth_file, method, uri, conn):
                                 conn.send(generate_unauthorized_response(auth_file, uri, method))
                                 if not keep_alive:
                                     conn.close()
