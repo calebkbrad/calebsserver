@@ -9,6 +9,7 @@ import os
 import yaml
 import string
 import hashlib
+import base64
 from urllib.parse import unquote
 
 CRLF = b'\r\n'
@@ -21,6 +22,8 @@ DEFAULTRESOURCE = config["DEFAULTRESOURCE"]
 REDIRECTFILE = config["REDIRECTS"]
 LANGUAGES = config["LANGUAGES"]
 CHARSETS = config["CHARSETS"]
+DIRECTORYPROTECT = config["DIRECTORYPROTECT"]
+PRIVATEKEY = config["PRIVATEKEY"].encode('ascii')
 
 # Parse redirect regex config file
 with open(REDIRECTFILE, 'r') as f:
@@ -51,6 +54,7 @@ status_codes = {
     "302": b"302 Found",
     "304": b"304 Not Modified",
     "400": b"400 Bad Request",
+    "401": b'401 Unauthorized',
     "403": b"403 Forbidden",
     "404": b"404 Not Found",
     "406": b'406 Not Acceptable',
@@ -98,6 +102,47 @@ def split_accepts(header: bytes) -> list:
         accept.append(value_pair)
     return accept
 
+# Check if authentication is needed to access a resource. Return path to auth file if found
+def check_if_auth(uri: str) -> str:
+    uri_components = uri.split('/')[3:]
+    # print(uri_components)
+    dir_to_check = WEBROOT
+    found_uri = ""
+    if exists(dir_to_check +  '/' + DIRECTORYPROTECT):
+        found_uri = dir_to_check + '/' + DIRECTORYPROTECT
+    for component in uri_components:
+        # print("in loop")
+        dir_to_check = dir_to_check + '/' + component
+        print(dir_to_check)
+        if not isdir(dir_to_check):
+            # print('breaking')
+            continue
+        if exists(dir_to_check + '/' + DIRECTORYPROTECT):
+            found_uri = dir_to_check + '/' + DIRECTORYPROTECT
+
+    return found_uri
+
+# Given the path to an "auth" file, extract relevent information
+def parse_auth_file(path_to_auth: str) -> tuple:
+    with open(path_to_auth, 'r') as f:
+        contents = f.readlines()
+    contents = [line.strip() for line in contents if '#' not in line]
+
+    auth_type = ""
+    realm = ""
+    users = []
+    for line in contents:
+        # print(line)
+        if 'authorization-type' in line:
+            auth_type = line.split('=')[1]
+        elif 'realm' in line:
+            realm = line.split('=')[1]
+        else:
+            users.append(line)
+    if auth_type and realm and users:
+        return (auth_type, realm, users)
+    return ()
+
 def validate_and_get_request_info(http_request: bytes) -> tuple:
     request_and_headers = http_request.split(CRLF)
     request = request_and_headers[0].decode('utf-8')
@@ -108,6 +153,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
         print('Fails 4 check')
         return ()
     method = request_line_elements[0]
+    orig_uri = request_line_elements[1]
     if 'cs531-cs_cbrad022' in request_line_elements[1]:
         request_line_elements[1] = request_line_elements[1].split("cs531-cs_cbrad022",1)[1]
     uri = unquote(WEBROOT + request_line_elements[1])
@@ -134,6 +180,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
 
     byte_range = []
     accept_headers = {}
+    auth = b''
     for header in headers:
         if b'Range:' in header:
             try:
@@ -164,9 +211,74 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
             except IndexError:
                 print('index error happened')
                 continue
+        elif b'Authorization:' in header:
+            if auth:
+                return ()
+            if b'Basic' in header:
+                auth = header.split(b'Basic')[1].decode('utf-8').strip().encode('ascii')
+                auth = base64.b64decode(auth)
+            elif b'Digest' in header:
+                # print('checking digest header')
+                auth = header.split(b'Digest')[1].decode('utf-8').strip()
+                digest_auth = {}
+                auth_details = auth.split(',')
+                for detail in auth_details:
+                    key, value = detail.split('=')
+                    digest_auth.update({key: value})
+                # print(digest_auth)
+                auth = digest_auth
 
     # print(accept_headers)
-    return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers)
+    return (method, uri, orig_uri, http_version, headers, keep_alive, byte_range, accept_headers, auth)
+
+def generate_digest_response(auth_digest: dict, credential: str, method: str, uri: str) -> bytes:
+    username = auth_digest['username'][1:-1]
+    realm = auth_digest[' realm'][1:-1]
+    nonce = auth_digest[' nonce'][1:-1]
+    ncount = auth_digest[' nc']
+    cnonce = auth_digest[' cnonce'][1:-1]
+    qop = auth_digest[' qop']
+    a1 = credential
+    a2 = f'{method}:{uri}'
+
+    # print(f'username:{username}')
+    # print(f'realm:{realm}')
+    # print(f'nonce:{nonce}')
+    # print(f'ncount:{ncount}')
+    # print(f'cnonce:{cnonce}')
+    # print(f'qop:{qop}')
+    # print(f'a1:{a1}')
+    # print(f'a2:{a2}')
+
+    hashed_a1 = hashlib.md5(a1.encode('ascii')).hexdigest()
+    hashed_a2 = hashlib.md5(a2.encode('ascii')).hexdigest()
+    prehashed_digest = f'{hashed_a1}:{nonce}:{ncount}:{cnonce}:{qop}:{hashed_a2}'
+    # print(prehashed_digest)
+    hashed_digest = hashlib.md5(prehashed_digest.encode('ascii')).hexdigest()
+    # print(hashed_digest)
+    return hashed_digest
+
+def check_digest_auth(auth_digest: dict, auth_file: str, method: str, uri: str) -> bool:
+    auth_type, realm, credentials = parse_auth_file(auth_file)
+    user_credential = ""
+    for detail in auth_digest.keys():
+        if 'realm' in detail:
+            if realm in auth_digest[detail]:
+                continue
+            return False
+        elif 'username' in detail:
+            verified = False
+            for credential in credentials:
+                if auth_digest[detail][1:-1] in credential:
+                    user_credential = credential
+                    break
+            if user_credential:
+                continue
+            return False
+    response = auth_digest[' response'][1:-1]
+    if generate_digest_response(auth_digest, credential, method, uri) == response:
+        return True
+    return False
 
 # Check if a method is currently supported
 def check_method(method: str) -> bool:
@@ -176,14 +288,20 @@ def check_method(method: str) -> bool:
 def check_version(http_version: str) -> bool:
     return http_version == "HTTP/1.1"
 
-
-# Generate an etag using md5
-def generate_etag(valid_uri: str) -> bytes:
+def generate_etag(valid_uri):
     hash_md5 = hashlib.md5()
     with open(valid_uri, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
-    return b'ETag: "' + hash_md5.hexdigest().encode('ascii') + b'"' + CRLF
+    return hash_md5.hexdigest().encode('ascii')
+
+# Generate an etag using md5
+def generate_etag_header(valid_uri: str) -> bytes:
+    hash_md5 = hashlib.md5()
+    with open(valid_uri, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return b'ETag: "' + generate_etag(valid_uri) + b'"' + CRLF
 
 # Get all conditional headers from list of headers
 def get_conditionals(headers: list) -> list:
@@ -205,7 +323,7 @@ def parse_if_modified_since(valid_uri: str, conditional_time: str) -> bool:
     return last_m_time >= parsed_conditional_time
 
 def parse_if_match(valid_uri: str, etag: str):
-    uri_etag = generate_etag(valid_uri)[6:-2]
+    uri_etag = generate_etag_header(valid_uri)[6:-2]
     etag_bytes = etag.encode('ascii')
     
     return etag_bytes == uri_etag
@@ -226,10 +344,6 @@ def check_if_multiple_reps(uri: str) -> list:
         if resource[1:] in possible_uri:
             existing_uris.append(possible_uri)
     return existing_uris
-
-# def parse_accept(accept_pairs: list) -> str:
-#     negotiated_uri = ""
-#     for mime_type in accept_pairs:
 
 def normalize_accept_encoding(accept_pairs: list):
     for pair in accept_pairs:
@@ -276,9 +390,6 @@ def parse_other_accepts(accept_pairs: list, possible_uris: list) -> str:
             return current_type
     return ""
     
-
-            
-
 # Given a dictionary of accepts, determines the uri with the highest q value (if applicable)
 def parse_accepts(accept_dict: dict, uri: str) -> str:
     possible_uris = check_if_multiple_reps(uri)
@@ -400,7 +511,7 @@ def generate_success_response_headers(uri: str, length=0) -> bytes:
     else:
         bytes_length = str(length).encode('ascii')
         headers += b'Content-Length: ' + bytes_length + CRLF
-    headers += generate_etag(uri)
+    headers += generate_etag_header(uri)
     return headers
 
 # Generate location header given the proper uri for a redirect
@@ -421,9 +532,41 @@ def generate_redirect_headers(redirect_uri: str, status_code: int):
     headers += generate_error_payload(status_code)
     return headers + CRLF
 
+def generate_unauthorized_response(auth_uri: str, uri: str, method: str) -> bytes:
+    auth_type, realm, users = parse_auth_file(auth_uri)
+    full_response = generate_status_code(401)
+    full_response += generate_date_header()
+    full_response += generate_server()
+    if 'Basic' in auth_type:
+        full_response += b'WWW-Authenticate: ' + auth_type.encode('ascii') + b' realm=' + realm.encode('ascii') + CRLF
+        full_response += b'Content-Type: text/html' + CRLFCRLF
+    elif 'Digest' in auth_type:
+        etag = generate_etag(uri)
+        time_stamp = generate_date_header()
+        to_hash = time_stamp + b':' + etag + b':' + PRIVATEKEY
+        hashed_nonce = hashlib.md5(to_hash).hexdigest().encode('ascii')
+        to_encode_nonce = time_stamp + b' ' + hashed_nonce
+        nonce = base64.b64encode(to_encode_nonce)
+
+        opaque_to_hash = uri.encode('ascii') + b':' + PRIVATEKEY
+        opaque = hashlib.md5(opaque_to_hash).hexdigest().encode('ascii')
+
+        full_response += b'WWW-Authenticate: Digest realm=' + realm.encode('ascii') + b', '
+        full_response += b'domain="' + uri.split(WEBROOT)[1].encode('ascii') + b'", '
+        full_response += b'qop="auth", '
+        full_response += b'nonce="' + nonce + b'", '
+        full_response += b'algorithm="MD5", '
+        full_response += b'opaque="' + opaque +b'"' + CRLF
+        full_response += b'Content-Type: text/html' + CRLFCRLF
+
+    if method == "GET":
+        full_response += generate_error_payload(401)
+    return full_response
+
 # Check if a resource exists, given a normalized uri (relative path)
 def check_resource(uri: str) -> bool:
     return exists(uri)
+
 def generate_directory_listing(directory_uri: str) -> bytes:
     list_table_elements = []
     for f in listdir(directory_uri):
@@ -506,14 +649,14 @@ def main(argv):
         
                 for request in requests:   
                     try:
-                        method, uri, version, headers, keep_alive, byte_range, accept_headers = validate_and_get_request_info(request)
+                        method, uri, orig_uri, version, headers, keep_alive, byte_range, accept_headers, auth = validate_and_get_request_info(request)
                     except ValueError as e:
                         conn.send(generate_error_response(400, "GET"))
                         conn.send(str(e).encode('ascii'))
                         conn.close()
                         print(str(e))
                         break
-
+                    
                     request_line = data.split(CRLF)[0]
                     # Handle TRACE execution
                     if method == "TRACE":
@@ -539,6 +682,43 @@ def main(argv):
                             conn.close()
                             break
                         continue
+                    
+                    auth_file = check_if_auth(uri)
+                    if auth_file and not auth:
+                        conn.send(generate_unauthorized_response(auth_file, uri, method))
+                        if not keep_alive:
+                            conn.close()
+                            break
+                        continue
+                    elif auth_file and auth:
+                        # print('checking auth')
+                        auth_type, realm, credentials = parse_auth_file(auth_file)
+                        # print('done checking auth')
+                        # conn.send(b'Auth from header = ' + base64.b64decode(auth) + CRLF)
+                        if "Basic" in auth_type:
+                            authorized = False
+                            user, pw = auth.split(b':')
+                            encrypted = hashlib.md5(pw).hexdigest().encode('ascii')
+                            auth_credential = user + b':' + encrypted
+                            for credential in credentials:
+                                # conn.send(b'Auth from file = ' + credential.encode('ascii') + CRLF)
+                                if auth_credential == credential.encode('ascii'):
+                                    authorized = True
+                                    break
+                            if not authorized:
+                                conn.send(generate_unauthorized_response(auth_file, uri, method))
+                                if not keep_alive:
+                                    conn.close()
+                                    break
+                                continue
+                        elif 'Digest' in auth_type:
+                            if not check_digest_auth(auth, auth_file, method, orig_uri):
+                                conn.send(generate_unauthorized_response(auth_file, uri, method))
+                                if not keep_alive:
+                                    conn.close()
+                                    break
+                                continue
+                            
                     if uri in virtual_uris.keys():
                         conn.send(generate_status_code(200))
                         conn.send(generate_success_response_headers(virtual_uris[uri]) + CRLF)
@@ -660,20 +840,6 @@ def main(argv):
                     if method == "OPTIONS":
                         conn.send(generate_error_response(200, method))
                         write_to_log(addr[0], request_line, 200, uri)
-                    # Handle HEAD execution
-                    # elif method == "HEAD":
-                    #     if isdir(uri):
-                    #         if exists(uri + DEFAULTRESOURCE):
-                    #             uri = uri + DEFAULTRESOURCE
-                    #             conn.send(generate_status_code(200))
-                    #             conn.send(generate_success_response_headers(uri) + CRLF)
-                    #         else:
-                    #             conn.send(generate_directory_response(uri))
-                    #     else:
-                    #         conn.send(generate_status_code(200))
-                    #         conn.send(generate_success_response_headers(uri) + CRLF)
-                    #         write_to_log(addr[0], request_line, 200, uri)
-                    # Handle GET execution
                     elif method == "GET" or method == "HEAD":
                         if isdir(uri):
                             if exists(uri + DEFAULTRESOURCE):
@@ -733,7 +899,8 @@ def main(argv):
                 break
 
 
-    # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nRange: bytes=-100\r\n\r\n
+    # GET /nested2/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Digest username="mln", realm="Colonial Place", uri="http://cs531-cs_cbrad022/a4-test/limited2/foo/bar.txt", qop=auth, nonce="RGF0ZTogVGh1LCAxNyBOb3YgMjAyMiAwMzoxMDo0MyBHTVQNCiA4ZDk1MDAwZWQwMjFiNmE5ZDhkNjE0ZGVlMWY1ODRjZQ", nc=00000001, cnonce="014a54548c61ba03827ef6a4dc2f7b4c", response="42d4d11ad7d46e2777305e6f3d069870"\r\n\r\n
+    # GET /nested2/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
     # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAccept-Charset: euc-jp; q=1.0, iso-2022-jp; q=0.0\r\n\r\n
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\nGET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
