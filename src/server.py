@@ -241,15 +241,14 @@ def generate_digest_response(auth_digest: dict, credential: str, method: str, ur
     a1 = credential
     a2 = f'{method}:{uri}'
 
-    print(username)
-    print(realm)
-    print(nonce)
-    print(ncount)
-    print(ncount)
-    print(cnonce)
-    print(qop)
-    print(a1)
-    print(a2)
+    print(f'username:{username}')
+    print(f'realm:{realm}')
+    print(f'nonce:{nonce}')
+    print(f'ncount:{ncount}')
+    print(f'cnonce:{cnonce}')
+    print(f'qop:{qop}')
+    print(f'a1:{a1}')
+    print(f'a2:{a2}')
 
     hashed_a1 = hashlib.md5(a1.encode('ascii')).hexdigest()
     hashed_a2 = hashlib.md5(a2.encode('ascii')).hexdigest()
