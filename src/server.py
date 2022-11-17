@@ -153,6 +153,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
         print('Fails 4 check')
         return ()
     method = request_line_elements[0]
+    orig_uri = request_line_elements[1]
     if 'cs531-cs_cbrad022' in request_line_elements[1]:
         request_line_elements[1] = request_line_elements[1].split("cs531-cs_cbrad022",1)[1]
     uri = unquote(WEBROOT + request_line_elements[1])
@@ -228,7 +229,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
                 auth = digest_auth
 
     # print(accept_headers)
-    return (method, uri, http_version, headers, keep_alive, byte_range, accept_headers, auth)
+    return (method, uri, orig_uri, http_version, headers, keep_alive, byte_range, accept_headers, auth)
 
 def generate_digest_response(auth_digest: dict, credential: str, method: str, uri: str) -> bytes:
     username = auth_digest['username'][1:-1]
@@ -239,12 +240,15 @@ def generate_digest_response(auth_digest: dict, credential: str, method: str, ur
     qop = auth_digest[' qop']
     a1 = credential
     a2 = f'{method}:{uri}'
-    print(credential)
+
+    print(username)
     print(realm)
     print(nonce)
     print(ncount)
+    print(ncount)
     print(cnonce)
     print(qop)
+    print(a1)
     print(a2)
 
     hashed_a1 = hashlib.md5(a1.encode('ascii')).hexdigest()
@@ -647,7 +651,7 @@ def main(argv):
         
                 for request in requests:   
                     try:
-                        method, uri, version, headers, keep_alive, byte_range, accept_headers, auth = validate_and_get_request_info(request)
+                        method, uri, orig_uri, version, headers, keep_alive, byte_range, accept_headers, auth = validate_and_get_request_info(request)
                     except ValueError as e:
                         conn.send(generate_error_response(400, "GET"))
                         conn.send(str(e).encode('ascii'))
@@ -710,7 +714,7 @@ def main(argv):
                                     break
                                 continue
                         elif 'Digest' in auth_type:
-                            if not check_digest_auth(auth, auth_file, method, uri, conn):
+                            if not check_digest_auth(auth, auth_file, method, orig_uri, conn):
                                 conn.send(generate_unauthorized_response(auth_file, uri, method))
                                 if not keep_alive:
                                     conn.close()
@@ -897,7 +901,7 @@ def main(argv):
                 break
 
 
-    # GET /nested2/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Digest username="mln", realm="Colonial Place", uri="http://cs531-cs_cbrad022/a4-test/limited2/foo/bar.txt", qop=auth, nonce="", nc=00000001, cnonce="014a54548c61ba03827ef6a4dc2f7b4c", response="3ce1d37ec34ae93229df35e6a5c1358e"\r\n\r\n
+    # GET /nested2/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Digest username="mln", realm="Colonial Place", uri="http://cs531-cs_cbrad022/a4-test/limited2/foo/bar.txt", qop=auth, nonce="RGF0ZTogVGh1LCAxNyBOb3YgMjAyMiAwMzoxMDo0MyBHTVQNCiA4ZDk1MDAwZWQwMjFiNmE5ZDhkNjE0ZGVlMWY1ODRjZQ", nc=00000001, cnonce="014a54548c61ba03827ef6a4dc2f7b4c", response="42d4d11ad7d46e2777305e6f3d069870"\r\n\r\n
     # GET /nested2/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # GET /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nAccept: image/png; q=1.0\r\nAccept-Language: en; q=0.2, ja; q=0.8, ru\r\n\r\n
     # HEAD /index HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAccept-Charset: euc-jp; q=1.0, iso-2022-jp; q=0.0\r\n\r\n
