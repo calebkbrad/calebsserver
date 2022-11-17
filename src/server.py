@@ -111,11 +111,11 @@ def check_if_auth(uri: str) -> str:
     if exists(dir_to_check +  '/' + DIRECTORYPROTECT):
         found_uri = dir_to_check + '/' + DIRECTORYPROTECT
     for component in uri_components:
-        print("in loop")
+        # print("in loop")
         dir_to_check = dir_to_check + '/' + component
         print(dir_to_check)
         if not isdir(dir_to_check):
-            print('breaking')
+            # print('breaking')
             continue
         if exists(dir_to_check + '/' + DIRECTORYPROTECT):
             found_uri = dir_to_check + '/' + DIRECTORYPROTECT
@@ -218,14 +218,14 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
                 auth = header.split(b'Basic')[1].decode('utf-8').strip().encode('ascii')
                 auth = base64.b64decode(auth)
             elif b'Digest' in header:
-                print('checking digest header')
+                # print('checking digest header')
                 auth = header.split(b'Digest')[1].decode('utf-8').strip()
                 digest_auth = {}
                 auth_details = auth.split(',')
                 for detail in auth_details:
                     key, value = detail.split('=')
                     digest_auth.update({key: value})
-                print(digest_auth)
+                # print(digest_auth)
                 auth = digest_auth
 
     # print(accept_headers)
@@ -241,24 +241,24 @@ def generate_digest_response(auth_digest: dict, credential: str, method: str, ur
     a1 = credential
     a2 = f'{method}:{uri}'
 
-    print(f'username:{username}')
-    print(f'realm:{realm}')
-    print(f'nonce:{nonce}')
-    print(f'ncount:{ncount}')
-    print(f'cnonce:{cnonce}')
-    print(f'qop:{qop}')
-    print(f'a1:{a1}')
-    print(f'a2:{a2}')
+    # print(f'username:{username}')
+    # print(f'realm:{realm}')
+    # print(f'nonce:{nonce}')
+    # print(f'ncount:{ncount}')
+    # print(f'cnonce:{cnonce}')
+    # print(f'qop:{qop}')
+    # print(f'a1:{a1}')
+    # print(f'a2:{a2}')
 
     hashed_a1 = hashlib.md5(a1.encode('ascii')).hexdigest()
     hashed_a2 = hashlib.md5(a2.encode('ascii')).hexdigest()
     prehashed_digest = f'{hashed_a1}:{nonce}:{ncount}:{cnonce}:{qop}:{hashed_a2}'
-    print(prehashed_digest)
+    # print(prehashed_digest)
     hashed_digest = hashlib.md5(prehashed_digest.encode('ascii')).hexdigest()
-    print(hashed_digest)
+    # print(hashed_digest)
     return hashed_digest
 
-def check_digest_auth(auth_digest: dict, auth_file: str, method: str, uri: str, conn) -> bool:
+def check_digest_auth(auth_digest: dict, auth_file: str, method: str, uri: str) -> bool:
     auth_type, realm, credentials = parse_auth_file(auth_file)
     user_credential = ""
     for detail in auth_digest.keys():
@@ -276,7 +276,6 @@ def check_digest_auth(auth_digest: dict, auth_file: str, method: str, uri: str, 
                 continue
             return False
     response = auth_digest[' response'][1:-1]
-    conn.send(generate_digest_response(auth_digest, credential, method, uri).encode('ascii'))
     if generate_digest_response(auth_digest, credential, method, uri) == response:
         return True
     return False
@@ -553,7 +552,7 @@ def generate_unauthorized_response(auth_uri: str, uri: str, method: str) -> byte
         opaque = hashlib.md5(opaque_to_hash).hexdigest().encode('ascii')
 
         full_response += b'WWW-Authenticate: Digest realm=' + realm.encode('ascii') + b', '
-        full_response += b'domain="' + uri.encode('ascii') + b'", '
+        full_response += b'domain="' + uri.split(WEBROOT)[1].encode('ascii') + b'", '
         full_response += b'qop="auth", '
         full_response += b'nonce="' + nonce + b'", '
         full_response += b'algorithm="MD5", '
@@ -713,7 +712,7 @@ def main(argv):
                                     break
                                 continue
                         elif 'Digest' in auth_type:
-                            if not check_digest_auth(auth, auth_file, method, orig_uri, conn):
+                            if not check_digest_auth(auth, auth_file, method, orig_uri):
                                 conn.send(generate_unauthorized_response(auth_file, uri, method))
                                 if not keep_alive:
                                     conn.close()
