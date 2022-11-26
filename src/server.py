@@ -131,16 +131,19 @@ def parse_auth_file(path_to_auth: str) -> tuple:
     auth_type = ""
     realm = ""
     users = []
+    allow = ['GET', 'HEAD', 'TRACE', 'OPTIONS']
     for line in contents:
         # print(line)
         if 'authorization-type' in line:
             auth_type = line.split('=')[1]
         elif 'realm' in line:
             realm = line.split('=')[1]
+        elif 'ALLOW' in line:
+            allow.append(line.split('ALLOW-')[1])
         else:
             users.append(line)
     if auth_type and realm and users:
-        return (auth_type, realm, users)
+        return (auth_type, realm, users, allow)
     return ()
 
 def validate_and_get_request_info(http_request: bytes) -> tuple:
@@ -181,6 +184,14 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     byte_range = []
     accept_headers = {}
     auth = b''
+    auth_type = ""
+    realm = ""
+    users = []
+    allow = []
+    if exists(uri) and check_if_auth(uri):
+        path_to_auth = check_if_auth(uri)
+        auth_type, realm, users, allow = parse_auth_file(path_to_auth)
+
     for header in headers:
         if b'Range:' in header:
             try:
@@ -259,7 +270,7 @@ def generate_digest_response(auth_digest: dict, credential: str, method: str, ur
     return hashed_digest
 
 def check_digest_auth(auth_digest: dict, auth_file: str, method: str, uri: str) -> bool:
-    auth_type, realm, credentials = parse_auth_file(auth_file)
+    auth_type, realm, credentials, allow = parse_auth_file(auth_file)
     user_credential = ""
     for detail in auth_digest.keys():
         if 'realm' in detail:
@@ -533,7 +544,7 @@ def generate_redirect_headers(redirect_uri: str, status_code: int):
     return headers + CRLF
 
 def generate_unauthorized_response(auth_uri: str, uri: str, method: str) -> bytes:
-    auth_type, realm, users = parse_auth_file(auth_uri)
+    auth_type, realm, users, allow = parse_auth_file(auth_uri)
     full_response = generate_status_code(401)
     full_response += generate_date_header()
     full_response += generate_server()
@@ -692,7 +703,7 @@ def main(argv):
                         continue
                     elif auth_file and auth:
                         # print('checking auth')
-                        auth_type, realm, credentials = parse_auth_file(auth_file)
+                        auth_type, realm, credentials, allow = parse_auth_file(auth_file)
                         # print('done checking auth')
                         # conn.send(b'Auth from header = ' + base64.b64decode(auth) + CRLF)
                         if "Basic" in auth_type:
