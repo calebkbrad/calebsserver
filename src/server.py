@@ -510,7 +510,7 @@ def generate_error_response(status: int, method: str, alternates=[], allowed=[])
     if method == "TRACE":
         full_response += b'Content-Type: message/http' + CRLF
     elif method == "OPTIONS" or status == 405:
-        full_response += generate_allow(allowed) + CRLF
+        full_response += generate_allow(allowed)
     if status != 200:
         full_response +=  b'Content-Type: text/html' + CRLF
         full_response += b'Transfer-Encoding: chunked' + CRLF
