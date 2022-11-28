@@ -553,6 +553,7 @@ def generate_unauthorized_response(auth_uri: str, uri: str, method: str) -> byte
     full_response = generate_status_code(401)
     full_response += generate_date_header()
     full_response += generate_server()
+    full_response += b'Transfer-Encoding: chunked' + CRLF
     if 'Basic' in auth_type:
         full_response += b'WWW-Authenticate: ' + auth_type.encode('ascii') + b' realm=' + realm.encode('ascii') + CRLF
         full_response += b'Content-Type: text/html' + CRLFCRLF
