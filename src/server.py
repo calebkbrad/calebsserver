@@ -10,6 +10,7 @@ import yaml
 import string
 import hashlib
 import base64
+import subprocess
 from urllib.parse import unquote
 
 CRLF = b'\r\n'
@@ -626,6 +627,11 @@ def generate_payload(valid_uri: str) -> bytes:
                 break
     return file_contents
 
+def execute_script(executable_uri: str):
+    result = subprocess.run(executable_uri, capture_output=True, text=True)
+    encoded_result = result.stdout.encode('ascii')
+    return encoded_result
+
 def write_to_log(addr: str, request: bytes, status: int, uri: str):
     log_entry = b''
     log_entry += addr.encode('ascii') + b' - - '
@@ -868,7 +874,9 @@ def main(argv):
                         conn.send(generate_error_response(200, method, allowed=allow))
                         write_to_log(addr[0], request_line, 200, uri)
                     elif method == "GET" or method == "HEAD":
-                        if isdir(uri):
+                        if not isdir(uri) and os.access(uri, os.X_OK) and method in ["POST", "GET", "HEAD"]:
+                            conn.send(execute_script(uri))
+                        elif isdir(uri):
                             if exists(uri + DEFAULTRESOURCE):
                                 uri = uri + DEFAULTRESOURCE
                                 conn.send(generate_status_code(200))
