@@ -196,7 +196,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     allow = []
     print(exists(uri))
     print(check_if_auth(uri))
-    if exists(uri) and check_if_auth(uri):
+    if (exists(uri) and check_if_auth(uri)) or method == "PUT":
         path_to_auth = check_if_auth(uri)
         auth_type, realm, users, allow = parse_auth_file(path_to_auth)
     else:
@@ -617,7 +617,6 @@ def generate_directory_response(directory_uri: str) -> bytes:
     response += generate_content_length(directory_uri)
     return response + CRLF
 
-
 def generate_payload(valid_uri: str) -> bytes:
     with open(valid_uri, 'rb') as f:
         file_contents = b''
@@ -688,8 +687,8 @@ def main(argv):
                         print(str(e))
                         break
                     print(allow)
-                    for thing in allow:
-                        conn.send(thing.encode('ascii'))
+                    # for thing in allow:
+                    #     conn.send(thing.encode('ascii'))
                     
                     request_line = data.split(CRLF)[0]
                     # Handle TRACE execution
