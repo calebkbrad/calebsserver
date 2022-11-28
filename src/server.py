@@ -48,6 +48,7 @@ with open(CHARSETS, 'r') as f:
 # Dictionary of status codes
 status_codes = {
     "200": b"200 OK",
+    "201": b'201 Created',
     "206": b'206 Partial Content',
     "300": b'300 Multiple Choice',
     "301": b"301 Moved Permanently",
@@ -57,9 +58,13 @@ status_codes = {
     "401": b'401 Unauthorized',
     "403": b"403 Forbidden",
     "404": b"404 Not Found",
+    "405": b'405 Method Not Allowed',
     "406": b'406 Not Acceptable',
     "408": b"408 Request Timeout",
+    "411": b'411 Length Required',
     "412": b"412 Precondition Failed",
+    "413": b'413 Request Entity Too Large',
+    "414": b'414 Request-URI Too Long',
     "500": b"500 Internal Server Error",
     "501": b"501 Not Implemented",
     "505": b"505 HTTP Version not Supported"
@@ -240,7 +245,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
                 auth = digest_auth
 
     # print(accept_headers)
-    return (method, uri, orig_uri, http_version, headers, keep_alive, byte_range, accept_headers, auth)
+    return (method, uri, orig_uri, http_version, headers, keep_alive, byte_range, accept_headers, auth, auth_type, realm, users, allow)
 
 def generate_digest_response(auth_digest: dict, credential: str, method: str, uri: str) -> bytes:
     username = auth_digest['username'][1:-1]
@@ -292,8 +297,8 @@ def check_digest_auth(auth_digest: dict, auth_file: str, method: str, uri: str) 
     return False
 
 # Check if a method is currently supported
-def check_method(method: str) -> bool:
-    return method in ['GET', 'HEAD', 'OPTIONS', 'TRACE']
+def check_method(method: str, allow: list) -> bool:
+    return method in allow
 
 # Check if version 1.1 is being used
 def check_version(http_version: str) -> bool:
@@ -660,7 +665,7 @@ def main(argv):
         
                 for request in requests:   
                     try:
-                        method, uri, orig_uri, version, headers, keep_alive, byte_range, accept_headers, auth = validate_and_get_request_info(request)
+                        method, uri, orig_uri, version, headers, keep_alive, byte_range, accept_headers, auth, auth_type, realm, users, allow = validate_and_get_request_info(request)
                     except ValueError as e:
                         conn.send(generate_error_response(400, "GET"))
                         conn.send(str(e).encode('ascii'))
@@ -679,8 +684,11 @@ def main(argv):
                             break
                         continue
                     # Return error responses if appropriate
-                    if not check_method(method):
-                        conn.send(generate_error_response(501, "GET") + CRLF)
+                    if not check_method(method, allow):
+                        if method in ['PUT', 'DELETE']:
+                            conn.send(generate_error_response(405, "GET"))
+                        else:
+                            conn.send(generate_error_response(501, "GET") + CRLF)
                         write_to_log(addr[0], request_line, 501, uri)
                         if not keep_alive:
                             conn.close()
