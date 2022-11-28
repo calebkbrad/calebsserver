@@ -475,8 +475,14 @@ def generate_server() -> bytes:
     return b'Server: calebsserver' + CRLF
     
 # Generate Allow header
-def generate_allow() -> bytes:
-    return b'Allow: GET, HEAD, OPTIONS, TRACE\r\n'
+def generate_allow(allow: list) -> bytes:
+    header = b'Allow: '
+    for method in allow:
+        header += method.encode('ascii')
+        if method != allow[-1]:
+            header += b', '
+    header += CRLF
+    return header
 
 # Generate status code
 def generate_status_code(status_code: int) -> bytes:
@@ -496,7 +502,7 @@ def generate_error_payload(status_code: int) -> bytes:
     return file_contents
 
 # Generate generic response headers not associated with content
-def generate_error_response(status: int, method: str, alternates=[]) -> bytes:
+def generate_error_response(status: int, method: str, alternates=[], allowed=[]) -> bytes:
     full_response = b''
     full_response += generate_status_code(status)
     full_response += generate_date_header()
@@ -504,7 +510,7 @@ def generate_error_response(status: int, method: str, alternates=[]) -> bytes:
     if method == "TRACE":
         full_response += b'Content-Type: message/http' + CRLF
     elif method == "OPTIONS":
-        full_response += generate_allow() + CRLF
+        full_response += generate_allow(allowed) + CRLF
     if status != 200:
         full_response +=  b'Content-Type: text/html' + CRLF
         full_response += b'Transfer-Encoding: chunked' + CRLF
@@ -858,7 +864,7 @@ def main(argv):
                     
                     # Handle OPTIONS execution
                     if method == "OPTIONS":
-                        conn.send(generate_error_response(200, method))
+                        conn.send(generate_error_response(200, method, allowed=allow))
                         write_to_log(addr[0], request_line, 200, uri)
                     elif method == "GET" or method == "HEAD":
                         if isdir(uri):
