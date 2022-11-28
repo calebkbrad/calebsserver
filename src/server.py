@@ -683,7 +683,13 @@ def main(argv):
                 if b'\r\n\r\n\r\n' in data:
                     data = data[:-2]
                 requests = data.split(CRLFCRLF)[:-1]
-        
+                payloads = []
+                for itr, request in enumerate(requests):
+                    request_line = request.split(CRLF)[0]
+                    if re.match("[A-Z]* (.)* HTTP/\d\.\d", request_line.decode('utf-8')):
+                        continue
+                    payloads.append(request)
+                    request.pop(itr)
                 for request in requests:   
                     try:
                         method, uri, orig_uri, version, headers, keep_alive, byte_range, accept_headers, auth, auth_type, realm, users, allow, payload_length = validate_and_get_request_info(request)
@@ -939,14 +945,14 @@ def main(argv):
                 conn.close()
                 write_to_log(addr[0], b"", 408, b"")
                 break
-            except Exception as e:
-                print(str(e))
-                sys.stderr.write(str(e))
-                conn.send(generate_error_response(500, "GET") + CRLF)
-                # write_to_log(addr[0], request_line, 500, uri)
-                conn.send(str(e).encode('ascii'))
-                conn.close()
-                break
+            # except Exception as e:
+            #     print(str(e))
+            #     sys.stderr.write(str(e))
+            #     conn.send(generate_error_response(500, "GET") + CRLF)
+            #     # write_to_log(addr[0], request_line, 500, uri)
+            #     conn.send(str(e).encode('ascii'))
+            #     conn.close()
+            #     break
 
 
     # GET /nested2/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Digest username="mln", realm="Colonial Place", uri="http://cs531-cs_cbrad022/a4-test/limited2/foo/bar.txt", qop=auth, nonce="RGF0ZTogVGh1LCAxNyBOb3YgMjAyMiAwMzoxMDo0MyBHTVQNCiA4ZDk1MDAwZWQwMjFiNmE5ZDhkNjE0ZGVlMWY1ODRjZQ", nc=00000001, cnonce="014a54548c61ba03827ef6a4dc2f7b4c", response="42d4d11ad7d46e2777305e6f3d069870"\r\n\r\n
