@@ -196,6 +196,8 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     if exists(uri) and check_if_auth(uri):
         path_to_auth = check_if_auth(uri)
         auth_type, realm, users, allow = parse_auth_file(path_to_auth)
+    if not allow:
+        allow = ["GET", "HEAD", "TRACE", "OPTIONS"]
 
     for header in headers:
         if b'Range:' in header:
@@ -679,6 +681,7 @@ def main(argv):
                         conn.close()
                         print(str(e))
                         break
+                    print(allow)
                     
                     request_line = data.split(CRLF)[0]
                     # Handle TRACE execution
@@ -934,5 +937,6 @@ def main(argv):
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-None-Match: "49c11da52d38c0512fb8169340db16f3"\r\nConnection: close\r\n\r\n
     # GET /.well-known/access.log HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
 #     GET http://cs531-cs_cbrad022/a2-test/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\n
 if __name__ == "__main__":
     main(sys.argv[1:])
