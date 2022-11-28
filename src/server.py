@@ -197,7 +197,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
         path_to_auth = check_if_auth(uri)
         auth_type, realm, users, allow = parse_auth_file(path_to_auth)
     if not allow:
-        allow = ["GET", "HEAD", "TRACE", "OPTIONS"]
+        allow = ["GET", "HEAD", "TRACE", "OPTIONS", "POST"]
 
     for header in headers:
         if b'Range:' in header:
@@ -206,9 +206,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
             except IndexError:
                 print('index error happened')
                 continue
-            print(len(list(filter(None, range_string.split('-')))))
             if len(list(filter(None, range_string.split('-')))) != 1:
-                print('in split')
                 range_string = range_string.split('-')
                 if len(range_string) > 2:
                     continue
@@ -511,7 +509,7 @@ def generate_error_response(status: int, method: str, alternates=[], allowed=[])
     full_response += generate_server()
     if method == "TRACE":
         full_response += b'Content-Type: message/http' + CRLF
-    elif method == "OPTIONS":
+    elif method == "OPTIONS" or status == 405:
         full_response += generate_allow(allowed) + CRLF
     if status != 200:
         full_response +=  b'Content-Type: text/html' + CRLF
@@ -696,7 +694,7 @@ def main(argv):
                     # Return error responses if appropriate
                     if not check_method(method, allow):
                         if method in ['PUT', 'DELETE']:
-                            conn.send(generate_error_response(405, "GET"))
+                            conn.send(generate_error_response(405, "GET", allowed=allow))
                         else:
                             conn.send(generate_error_response(501, "GET") + CRLF)
                         write_to_log(addr[0], request_line, 501, uri)
