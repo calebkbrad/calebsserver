@@ -137,7 +137,7 @@ def parse_auth_file(path_to_auth: str) -> tuple:
     auth_type = ""
     realm = ""
     users = []
-    allow = ['GET', 'HEAD', 'TRACE', 'OPTIONS']
+    allow = ['GET', 'HEAD', 'TRACE', 'OPTIONS', 'POST']
     for line in contents:
         # print(line)
         if 'authorization-type' in line:
@@ -194,6 +194,8 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     realm = ""
     users = []
     allow = []
+    print(exists(uri))
+    print(check_if_auth(uri))
     if exists(uri) and check_if_auth(uri):
         path_to_auth = check_if_auth(uri)
         auth_type, realm, users, allow = parse_auth_file(path_to_auth)
@@ -686,6 +688,8 @@ def main(argv):
                         print(str(e))
                         break
                     print(allow)
+                    for thing in allow:
+                        conn.send(thing.encode('ascii'))
                     
                     request_line = data.split(CRLF)[0]
                     # Handle TRACE execution
