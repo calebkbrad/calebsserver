@@ -194,6 +194,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     realm = ""
     users = []
     allow = []
+    length = -1
     print(exists(uri))
     print(check_if_auth(uri))
     if (exists(uri) and check_if_auth(uri)) or method == "PUT":
@@ -246,9 +247,11 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
                     digest_auth.update({key: value})
                 # print(digest_auth)
                 auth = digest_auth
-
+        elif b'Content-Length' in header:
+            length = int(header.split(b'Content-Length: ')[1].decode('utf-8'))
+        
     # print(accept_headers)
-    return (method, uri, orig_uri, http_version, headers, keep_alive, byte_range, accept_headers, auth, auth_type, realm, users, allow)
+    return (method, uri, orig_uri, http_version, headers, keep_alive, byte_range, accept_headers, auth, auth_type, realm, users, allow, length)
 
 def generate_digest_response(auth_digest: dict, credential: str, method: str, uri: str) -> bytes:
     username = auth_digest['username'][1:-1]
@@ -679,7 +682,7 @@ def main(argv):
         
                 for request in requests:   
                     try:
-                        method, uri, orig_uri, version, headers, keep_alive, byte_range, accept_headers, auth, auth_type, realm, users, allow = validate_and_get_request_info(request)
+                        method, uri, orig_uri, version, headers, keep_alive, byte_range, accept_headers, auth, auth_type, realm, users, allow, length = validate_and_get_request_info(request)
                     except ValueError as e:
                         conn.send(generate_error_response(400, "GET"))
                         conn.send(str(e).encode('ascii'))
@@ -917,8 +920,9 @@ def main(argv):
                                     conn.send(generate_success_response_headers(uri, length) + CRLF)
                                     if method == "GET":
                                         conn.send(payload)
-                            
                         write_to_log(addr[0], request_line, 200, uri)
+                    elif method == "PUT":
+                        pass
                     if not keep_alive:
                         conn.close()
                         break
