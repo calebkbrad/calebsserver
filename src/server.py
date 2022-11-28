@@ -248,10 +248,10 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
                 # print(digest_auth)
                 auth = digest_auth
         elif b'Content-Length' in header:
-            length = int(header.split(b'Content-Length: ')[1].decode('utf-8'))
+            payload_length = int(header.split(b'Content-Length: ')[1].decode('utf-8'))
         
     # print(accept_headers)
-    return (method, uri, orig_uri, http_version, headers, keep_alive, byte_range, accept_headers, auth, auth_type, realm, users, allow, length)
+    return (method, uri, orig_uri, http_version, headers, keep_alive, byte_range, accept_headers, auth, auth_type, realm, users, allow, payload_length)
 
 def generate_digest_response(auth_digest: dict, credential: str, method: str, uri: str) -> bytes:
     username = auth_digest['username'][1:-1]
@@ -517,7 +517,7 @@ def generate_error_response(status: int, method: str, alternates=[], allowed=[])
         full_response += b'Content-Type: message/http' + CRLF
     elif method == "OPTIONS" or status == 405:
         full_response += generate_allow(allowed)
-    if status != 200:
+    if status != 200 or method == "DELETE":
         full_response +=  b'Content-Type: text/html' + CRLF
         full_response += b'Transfer-Encoding: chunked' + CRLF
     if alternates:
@@ -631,10 +631,14 @@ def generate_payload(valid_uri: str) -> bytes:
                 break
     return file_contents
 
-def execute_script(executable_uri: str):
+def execute_script(executable_uri: str)-> bytes:
     result = subprocess.run(executable_uri, capture_output=True, text=True)
     encoded_result = result.stdout.encode('ascii')
     return encoded_result
+
+def delete_resource(uri: str):
+    if exists(uri):
+        os.remove(uri)
 
 def write_to_log(addr: str, request: bytes, status: int, uri: str):
     log_entry = b''
@@ -682,7 +686,7 @@ def main(argv):
         
                 for request in requests:   
                     try:
-                        method, uri, orig_uri, version, headers, keep_alive, byte_range, accept_headers, auth, auth_type, realm, users, allow, length = validate_and_get_request_info(request)
+                        method, uri, orig_uri, version, headers, keep_alive, byte_range, accept_headers, auth, auth_type, realm, users, allow, payload_length = validate_and_get_request_info(request)
                     except ValueError as e:
                         conn.send(generate_error_response(400, "GET"))
                         conn.send(str(e).encode('ascii'))
@@ -923,6 +927,10 @@ def main(argv):
                         write_to_log(addr[0], request_line, 200, uri)
                     elif method == "PUT":
                         pass
+                    elif method == "DELETE":
+                        delete_resource(uri)
+                        conn.send(generate_error_response(200, method))
+
                     if not keep_alive:
                         conn.close()
                         break
