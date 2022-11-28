@@ -197,7 +197,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     if exists(uri) and check_if_auth(uri):
         path_to_auth = check_if_auth(uri)
         auth_type, realm, users, allow = parse_auth_file(path_to_auth)
-    if not allow:
+    else:
         allow = ["GET", "HEAD", "TRACE", "OPTIONS", "POST"]
 
     for header in headers:
