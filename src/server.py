@@ -573,7 +573,7 @@ def generate_unauthorized_response(auth_uri: str, uri: str, method: str) -> byte
         full_response += b'WWW-Authenticate: ' + auth_type.encode('ascii') + b' realm=' + realm.encode('ascii') + CRLF
         full_response += b'Content-Type: text/html' + CRLFCRLF
     elif 'Digest' in auth_type:
-        etag = generate_etag(uri)
+        etag = generate_etag(auth_uri)
         time_stamp = generate_date_header()
         to_hash = time_stamp + b':' + etag + b':' + PRIVATEKEY
         hashed_nonce = hashlib.md5(to_hash).hexdigest().encode('ascii')
@@ -948,14 +948,14 @@ def main(argv):
                 conn.close()
                 write_to_log(addr[0], b"", 408, b"")
                 break
-            except Exception as e:
-                print(str(e))
-                sys.stderr.write(str(e))
-                conn.send(generate_error_response(500, "GET") + CRLF)
-                # write_to_log(addr[0], request_line, 500, uri)
-                conn.send(str(e).encode('ascii'))
-                conn.close()
-                break
+            # except Exception as e:
+            #     print(str(e))
+            #     sys.stderr.write(str(e))
+            #     conn.send(generate_error_response(500, "GET") + CRLF)
+            #     # write_to_log(addr[0], request_line, 500, uri)
+            #     conn.send(str(e).encode('ascii'))
+            #     conn.close()
+            #     break
 
 
     # GET /nested2/index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Digest username="mln", realm="Colonial Place", uri="http://cs531-cs_cbrad022/a4-test/limited2/foo/bar.txt", qop=auth, nonce="RGF0ZTogVGh1LCAxNyBOb3YgMjAyMiAwMzoxMDo0MyBHTVQNCiA4ZDk1MDAwZWQwMjFiNmE5ZDhkNjE0ZGVlMWY1ODRjZQ", nc=00000001, cnonce="014a54548c61ba03827ef6a4dc2f7b4c", response="42d4d11ad7d46e2777305e6f3d069870"\r\n\r\n
@@ -969,5 +969,6 @@ def main(argv):
 #     GET http://cs531-cs_cbrad022/a2-test/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
     # DELETE /nested2/to_delete.txt HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Basic YmRhOmJkYQ==\r\n\r\n
     # DELETE /a5-test/index.html.denmark HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n
+    # GET http://cs531-cs_cbrad022/a5-test/limited4/foo/barbar.txt HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
 if __name__ == "__main__":
     main(sys.argv[1:])
