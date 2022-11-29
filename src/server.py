@@ -197,7 +197,7 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     payload_length = -1
     print(exists(uri))
     print(check_if_auth(uri))
-    if (exists(uri) and check_if_auth(uri)) or method == "PUT":
+    if (exists(uri) and check_if_auth(uri)) or method == "PUT" or method == "DELETE":
         path_to_auth = check_if_auth(uri)
         auth_type, realm, users, allow = parse_auth_file(path_to_auth)
     else:
