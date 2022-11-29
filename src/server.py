@@ -196,10 +196,13 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     allow = []
     payload_length = -1
     print(exists(uri))
-    print(check_if_auth(uri))
+    print("auth_file is " + check_if_auth(uri))
     if (exists(uri) and check_if_auth(uri)) or method == "PUT" or method == "DELETE":
-        path_to_auth = check_if_auth(uri)
-        auth_type, realm, users, allow = parse_auth_file(path_to_auth)
+        try:
+            path_to_auth = check_if_auth(uri)
+            auth_type, realm, users, allow = parse_auth_file(path_to_auth)
+        except:
+            pass
     else:
         allow = ["GET", "HEAD", "TRACE", "OPTIONS", "POST"]
 
@@ -964,6 +967,7 @@ def main(argv):
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-None-Match: "49c11da52d38c0512fb8169340db16f3"\r\nConnection: close\r\n\r\n
     # GET /.well-known/access.log HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
 #     GET http://cs531-cs_cbrad022/a2-test/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
-    # GET /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\n\r\n
+    # DELETE /nested2/to_delete.txt HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Basic YmRhOmJkYQ==\r\n\r\n
+    # DELETE /a5-test/index.html.denmark HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n
 if __name__ == "__main__":
     main(sys.argv[1:])
