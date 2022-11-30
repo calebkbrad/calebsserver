@@ -945,11 +945,11 @@ def main(argv):
                     elif method == "PUT":
                         put_resource(uri, payloads.pop(0))
                         conn.send(generate_error_response(201, method))
+                        conn.send(generate_error_payload('put'))
                     elif method == "DELETE":
                         delete_resource(uri)
                         conn.send(generate_error_response(200, method))
                         conn.send(generate_error_payload('deleted') + CRLF)
-
                     if not keep_alive:
                         conn.close()
                         break
