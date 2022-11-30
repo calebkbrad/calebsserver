@@ -10,6 +10,7 @@ import yaml
 import string
 import hashlib
 import base64
+import subprocess
 from urllib.parse import unquote
 
 CRLF = b'\r\n'
@@ -48,6 +49,7 @@ with open(CHARSETS, 'r') as f:
 # Dictionary of status codes
 status_codes = {
     "200": b"200 OK",
+    "201": b'201 Created',
     "206": b'206 Partial Content',
     "300": b'300 Multiple Choice',
     "301": b"301 Moved Permanently",
@@ -57,9 +59,13 @@ status_codes = {
     "401": b'401 Unauthorized',
     "403": b"403 Forbidden",
     "404": b"404 Not Found",
+    "405": b'405 Method Not Allowed',
     "406": b'406 Not Acceptable',
     "408": b"408 Request Timeout",
+    "411": b'411 Length Required',
     "412": b"412 Precondition Failed",
+    "413": b'413 Request Entity Too Large',
+    "414": b'414 Request-URI Too Long',
     "500": b"500 Internal Server Error",
     "501": b"501 Not Implemented",
     "505": b"505 HTTP Version not Supported"
@@ -113,7 +119,7 @@ def check_if_auth(uri: str) -> str:
     for component in uri_components:
         # print("in loop")
         dir_to_check = dir_to_check + '/' + component
-        print(dir_to_check)
+        # print(dir_to_check)
         if not isdir(dir_to_check):
             # print('breaking')
             continue
@@ -131,7 +137,7 @@ def parse_auth_file(path_to_auth: str) -> tuple:
     auth_type = ""
     realm = ""
     users = []
-    allow = ['GET', 'HEAD', 'TRACE', 'OPTIONS']
+    allow = ['GET', 'HEAD', 'TRACE', 'OPTIONS', 'POST']
     for line in contents:
         # print(line)
         if 'authorization-type' in line:
@@ -188,24 +194,30 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     realm = ""
     users = []
     allow = []
-    if exists(uri) and check_if_auth(uri):
-        path_to_auth = check_if_auth(uri)
-        auth_type, realm, users, allow = parse_auth_file(path_to_auth)
+    payload_length = -1
+    # print(exists(uri))
+    # print("auth_file is " + check_if_auth(uri))
+    if (exists(uri) and check_if_auth(uri)) or method == "PUT" or method == "DELETE":
+        try:
+            path_to_auth = check_if_auth(uri)
+            auth_type, realm, users, allow = parse_auth_file(path_to_auth)
+        except:
+            allow = ["GET", "HEAD", "TRACE", "OPTIONS", "POST"]
+    else:
+        allow = ["GET", "HEAD", "TRACE", "OPTIONS", "POST"]
 
     for header in headers:
         if b'Range:' in header:
             try:
                 range_string = header.split(b': bytes=')[1].decode('utf-8')
             except IndexError:
-                print('index error happened')
+                # print('index error happened')
                 continue
-            print(len(list(filter(None, range_string.split('-')))))
             if len(list(filter(None, range_string.split('-')))) != 1:
-                print('in split')
                 range_string = range_string.split('-')
                 if len(range_string) > 2:
                     continue
-                print(range_string)
+                # print(range_string)
                 for num in range_string:
                     try:
                         byte_range.append(int(num))
@@ -213,14 +225,14 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
                         continue
             else:
                 byte_range.append(int(range_string))
-            print(byte_range)
+            # print(byte_range)
             continue
         elif b'Accept' in header:
             try:
                 key = header.decode('utf-8').split(':')[0]
                 accept_headers.update({key: split_accepts(header)})
             except IndexError:
-                print('index error happened')
+                # print('index error happened')
                 continue
         elif b'Authorization:' in header:
             if auth:
@@ -238,9 +250,11 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
                     digest_auth.update({key: value})
                 # print(digest_auth)
                 auth = digest_auth
-
+        elif b'Content-Length' in header:
+            payload_length = int(header.split(b'Content-Length: ')[1].decode('utf-8'))
+        
     # print(accept_headers)
-    return (method, uri, orig_uri, http_version, headers, keep_alive, byte_range, accept_headers, auth)
+    return (method, uri, orig_uri, http_version, headers, keep_alive, byte_range, accept_headers, auth, auth_type, realm, users, allow, payload_length)
 
 def generate_digest_response(auth_digest: dict, credential: str, method: str, uri: str) -> bytes:
     username = auth_digest['username'][1:-1]
@@ -292,8 +306,8 @@ def check_digest_auth(auth_digest: dict, auth_file: str, method: str, uri: str) 
     return False
 
 # Check if a method is currently supported
-def check_method(method: str) -> bool:
-    return method in ['GET', 'HEAD', 'OPTIONS', 'TRACE']
+def check_method(method: str, allow: list) -> bool:
+    return method in allow
 
 # Check if version 1.1 is being used
 def check_version(http_version: str) -> bool:
@@ -470,8 +484,14 @@ def generate_server() -> bytes:
     return b'Server: calebsserver' + CRLF
     
 # Generate Allow header
-def generate_allow() -> bytes:
-    return b'Allow: GET, HEAD, OPTIONS, TRACE\r\n'
+def generate_allow(allow: list) -> bytes:
+    header = b'Allow: '
+    for method in allow:
+        header += method.encode('ascii')
+        if method != allow[-1]:
+            header += b', '
+    header += CRLF
+    return header
 
 # Generate status code
 def generate_status_code(status_code: int) -> bytes:
@@ -491,16 +511,16 @@ def generate_error_payload(status_code: int) -> bytes:
     return file_contents
 
 # Generate generic response headers not associated with content
-def generate_error_response(status: int, method: str, alternates=[]) -> bytes:
+def generate_error_response(status: int, method: str, alternates=[], allowed=[]) -> bytes:
     full_response = b''
     full_response += generate_status_code(status)
     full_response += generate_date_header()
     full_response += generate_server()
     if method == "TRACE":
         full_response += b'Content-Type: message/http' + CRLF
-    elif method == "OPTIONS":
-        full_response += generate_allow() + CRLF
-    if status != 200:
+    elif method == "OPTIONS" or status == 405:
+        full_response += generate_allow(allowed)
+    if status != 200 or method == "DELETE":
         full_response +=  b'Content-Type: text/html' + CRLF
         full_response += b'Transfer-Encoding: chunked' + CRLF
     if alternates:
@@ -548,11 +568,12 @@ def generate_unauthorized_response(auth_uri: str, uri: str, method: str) -> byte
     full_response = generate_status_code(401)
     full_response += generate_date_header()
     full_response += generate_server()
+    full_response += b'Transfer-Encoding: chunked' + CRLF
     if 'Basic' in auth_type:
         full_response += b'WWW-Authenticate: ' + auth_type.encode('ascii') + b' realm=' + realm.encode('ascii') + CRLF
         full_response += b'Content-Type: text/html' + CRLFCRLF
     elif 'Digest' in auth_type:
-        etag = generate_etag(uri)
+        etag = generate_etag(auth_uri)
         time_stamp = generate_date_header()
         to_hash = time_stamp + b':' + etag + b':' + PRIVATEKEY
         hashed_nonce = hashlib.md5(to_hash).hexdigest().encode('ascii')
@@ -602,7 +623,6 @@ def generate_directory_response(directory_uri: str) -> bytes:
     response += generate_content_length(directory_uri)
     return response + CRLF
 
-
 def generate_payload(valid_uri: str) -> bytes:
     with open(valid_uri, 'rb') as f:
         file_contents = b''
@@ -614,6 +634,19 @@ def generate_payload(valid_uri: str) -> bytes:
                 break
     return file_contents
 
+def execute_script(executable_uri: str)-> bytes:
+    result = subprocess.run(executable_uri, capture_output=True, text=True)
+    encoded_result = result.stdout.encode('ascii')
+    return encoded_result
+
+def delete_resource(uri: str):
+    if exists(uri):
+        os.remove(uri)
+
+def put_resource(new_uri: str, payload: bytes):
+    with open(new_uri, 'w') as new_resource:
+        new_resource.write(payload.decode('utf-8'))
+    
 def write_to_log(addr: str, request: bytes, status: int, uri: str):
     log_entry = b''
     log_entry += addr.encode('ascii') + b' - - '
@@ -656,17 +689,28 @@ def main(argv):
                 data = data.decode('unicode_escape').encode("raw_unicode_escape")
                 if b'\r\n\r\n\r\n' in data:
                     data = data[:-2]
-                requests = data.split(CRLFCRLF)[:-1]
-        
+                requests = data.split(CRLFCRLF)
+                payloads = []
+                for itr, request in enumerate(requests):
+                    # print('checking request')
+                    # print(request)
+                    request_line = request.split(CRLF)[0]
+                    if re.match("[A-Z]* (.)* HTTP/\d\.\d", request_line.decode('utf-8')):
+                        continue
+                    payloads.append(request)
+                    requests.pop(itr)
                 for request in requests:   
                     try:
-                        method, uri, orig_uri, version, headers, keep_alive, byte_range, accept_headers, auth = validate_and_get_request_info(request)
+                        method, uri, orig_uri, version, headers, keep_alive, byte_range, accept_headers, auth, auth_type, realm, users, allow, payload_length = validate_and_get_request_info(request)
                     except ValueError as e:
                         conn.send(generate_error_response(400, "GET"))
                         conn.send(str(e).encode('ascii'))
                         conn.close()
                         print(str(e))
                         break
+                    # print(allow)
+                    # for thing in allow:
+                    #     conn.send(thing.encode('ascii'))
                     
                     request_line = data.split(CRLF)[0]
                     # Handle TRACE execution
@@ -679,8 +723,11 @@ def main(argv):
                             break
                         continue
                     # Return error responses if appropriate
-                    if not check_method(method):
-                        conn.send(generate_error_response(501, "GET") + CRLF)
+                    if not check_method(method, allow):
+                        if method in ['PUT', 'DELETE']:
+                            conn.send(generate_error_response(405, "GET", allowed=allow))
+                        else:
+                            conn.send(generate_error_response(501, "GET") + CRLF)
                         write_to_log(addr[0], request_line, 501, uri)
                         if not keep_alive:
                             conn.close()
@@ -777,14 +824,15 @@ def main(argv):
                                 conn.close()
                                 break
                             continue
-                    if not check_resource(uri):
-                        conn.send(generate_error_response(404, method) + CRLF)
-                        conn.send(uri.encode('ascii'))
-                        write_to_log(addr[0], request_line, 404, uri)
-                        if not keep_alive:
-                            conn.close()
-                            break
-                        continue
+                    if method not in ['PUT', 'POST']:
+                        if not check_resource(uri):
+                            conn.send(generate_error_response(404, method) + CRLF)
+                            conn.send(uri.encode('ascii'))
+                            write_to_log(addr[0], request_line, 404, uri)
+                            if not keep_alive:
+                                conn.close()
+                                break
+                            continue
                     conditional_headers = get_conditionals(headers)
                     already_processed = False
                     for conditional in conditional_headers.keys():
@@ -849,10 +897,12 @@ def main(argv):
                     
                     # Handle OPTIONS execution
                     if method == "OPTIONS":
-                        conn.send(generate_error_response(200, method))
+                        conn.send(generate_error_response(200, method, allowed=allow))
                         write_to_log(addr[0], request_line, 200, uri)
                     elif method == "GET" or method == "HEAD":
-                        if isdir(uri):
+                        if not isdir(uri) and os.access(uri, os.X_OK) and method in ["POST", "GET", "HEAD"]:
+                            conn.send(execute_script(uri))
+                        elif isdir(uri):
                             if exists(uri + DEFAULTRESOURCE):
                                 uri = uri + DEFAULTRESOURCE
                                 conn.send(generate_status_code(200))
@@ -890,8 +940,15 @@ def main(argv):
                                     conn.send(generate_success_response_headers(uri, length) + CRLF)
                                     if method == "GET":
                                         conn.send(payload)
-                            
                         write_to_log(addr[0], request_line, 200, uri)
+                    elif method == "PUT":
+                        put_resource(uri, payloads.pop(0))
+                        conn.send(generate_error_response(201, method))
+                        conn.send(generate_error_payload('put'))
+                    elif method == "DELETE":
+                        delete_resource(uri)
+                        conn.send(generate_error_response(200, method))
+                        conn.send(generate_error_payload('deleted') + CRLF)
                     if not keep_alive:
                         conn.close()
                         break
@@ -919,5 +976,9 @@ def main(argv):
     # HEAD /index.html HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nIf-None-Match: "49c11da52d38c0512fb8169340db16f3"\r\nConnection: close\r\n\r\n
     # GET /.well-known/access.log HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
 #     GET http://cs531-cs_cbrad022/a2-test/ HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # DELETE /nested2/to_delete.txt HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Basic YmRhOmJkYQ==\r\n\r\n
+    # DELETE /a5-test/index.html.denmark HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n
+    # GET http://cs531-cs_cbrad022/a5-test/limited4/foo/barbar.txt HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # PUT http://cs531-cs_cbrad022/a5-test/limited3/foobar.txt HTTP/1.1\r\nHost: cs531-cs_cbrad022:80\r\nUser-Agent: CS531 Assignment 5 Tester/1669774703\r\nAuthorization: Basic YmRhOmJkYQ==\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: 63\r\n\r\nhere comes a PUT method\n\nin text/plain format\n\nhooray for PUT!\n\n
 if __name__ == "__main__":
     main(sys.argv[1:])
