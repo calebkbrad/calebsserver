@@ -948,6 +948,7 @@ def main(argv):
                     elif method == "DELETE":
                         delete_resource(uri)
                         conn.send(generate_error_response(200, method))
+                        conn.send(generate_error_payload('deleted') + CRLF)
 
                     if not keep_alive:
                         conn.close()
