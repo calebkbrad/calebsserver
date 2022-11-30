@@ -643,6 +643,10 @@ def delete_resource(uri: str):
     if exists(uri):
         os.remove(uri)
 
+def put_resource(new_uri: str, payload: bytes):
+    with open(new_uri, 'w') as new_resource:
+        new_resource.write(payload.decode('utf-8'))
+    
 def write_to_log(addr: str, request: bytes, status: int, uri: str):
     log_entry = b''
     log_entry += addr.encode('ascii') + b' - - '
@@ -685,14 +689,17 @@ def main(argv):
                 data = data.decode('unicode_escape').encode("raw_unicode_escape")
                 if b'\r\n\r\n\r\n' in data:
                     data = data[:-2]
-                requests = data.split(CRLFCRLF)[:-1]
+                requests = data.split(CRLFCRLF)
+                print(requests)
                 payloads = []
                 for itr, request in enumerate(requests):
+                    print('checking request')
+                    print(request)
                     request_line = request.split(CRLF)[0]
                     if re.match("[A-Z]* (.)* HTTP/\d\.\d", request_line.decode('utf-8')):
                         continue
                     payloads.append(request)
-                    request.pop(itr)
+                    requests.pop(itr)
                 for request in requests:   
                     try:
                         method, uri, orig_uri, version, headers, keep_alive, byte_range, accept_headers, auth, auth_type, realm, users, allow, payload_length = validate_and_get_request_info(request)
@@ -818,14 +825,15 @@ def main(argv):
                                 conn.close()
                                 break
                             continue
-                    if not check_resource(uri):
-                        conn.send(generate_error_response(404, method) + CRLF)
-                        conn.send(uri.encode('ascii'))
-                        write_to_log(addr[0], request_line, 404, uri)
-                        if not keep_alive:
-                            conn.close()
-                            break
-                        continue
+                    if method not in ['PUT', 'POST']:
+                        if not check_resource(uri):
+                            conn.send(generate_error_response(404, method) + CRLF)
+                            conn.send(uri.encode('ascii'))
+                            write_to_log(addr[0], request_line, 404, uri)
+                            if not keep_alive:
+                                conn.close()
+                                break
+                            continue
                     conditional_headers = get_conditionals(headers)
                     already_processed = False
                     for conditional in conditional_headers.keys():
@@ -935,7 +943,8 @@ def main(argv):
                                         conn.send(payload)
                         write_to_log(addr[0], request_line, 200, uri)
                     elif method == "PUT":
-                        pass
+                        put_resource(uri, payloads.pop(0))
+                        conn.send(generate_error_response(201, method))
                     elif method == "DELETE":
                         delete_resource(uri)
                         conn.send(generate_error_response(200, method))
@@ -970,5 +979,6 @@ def main(argv):
     # DELETE /nested2/to_delete.txt HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\nAuthorization: Basic YmRhOmJkYQ==\r\n\r\n
     # DELETE /a5-test/index.html.denmark HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n
     # GET http://cs531-cs_cbrad022/a5-test/limited4/foo/barbar.txt HTTP/1.1\r\nHost: cs531-cs_cbrad022\r\nConnection: close\r\n\r\n
+    # PUT http://cs531-cs_cbrad022/a5-test/limited3/foobar.txt HTTP/1.1\r\nHost: cs531-cs_cbrad022:80\r\nUser-Agent: CS531 Assignment 5 Tester/1669774703\r\nAuthorization: Basic YmRhOmJkYQ==\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: 63\r\n\r\nhere comes a PUT method\n\nin text/plain format\n\nhooray for PUT!\n\n
 if __name__ == "__main__":
     main(sys.argv[1:])
