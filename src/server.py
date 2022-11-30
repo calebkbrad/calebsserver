@@ -689,7 +689,7 @@ def main(argv):
                 data = data.decode('unicode_escape').encode("raw_unicode_escape")
                 if b'\r\n\r\n\r\n' in data:
                     data = data[:-2]
-                requests = data.split(CRLFCRLF)
+                requests = data.split(CRLFCRLF)[:-1]
                 print(requests)
                 payloads = []
                 for itr, request in enumerate(requests):
