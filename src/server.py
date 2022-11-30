@@ -119,7 +119,7 @@ def check_if_auth(uri: str) -> str:
     for component in uri_components:
         # print("in loop")
         dir_to_check = dir_to_check + '/' + component
-        print(dir_to_check)
+        # print(dir_to_check)
         if not isdir(dir_to_check):
             # print('breaking')
             continue
@@ -195,8 +195,8 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
     users = []
     allow = []
     payload_length = -1
-    print(exists(uri))
-    print("auth_file is " + check_if_auth(uri))
+    # print(exists(uri))
+    # print("auth_file is " + check_if_auth(uri))
     if (exists(uri) and check_if_auth(uri)) or method == "PUT" or method == "DELETE":
         try:
             path_to_auth = check_if_auth(uri)
@@ -211,13 +211,13 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
             try:
                 range_string = header.split(b': bytes=')[1].decode('utf-8')
             except IndexError:
-                print('index error happened')
+                # print('index error happened')
                 continue
             if len(list(filter(None, range_string.split('-')))) != 1:
                 range_string = range_string.split('-')
                 if len(range_string) > 2:
                     continue
-                print(range_string)
+                # print(range_string)
                 for num in range_string:
                     try:
                         byte_range.append(int(num))
@@ -225,14 +225,14 @@ def validate_and_get_request_info(http_request: bytes) -> tuple:
                         continue
             else:
                 byte_range.append(int(range_string))
-            print(byte_range)
+            # print(byte_range)
             continue
         elif b'Accept' in header:
             try:
                 key = header.decode('utf-8').split(':')[0]
                 accept_headers.update({key: split_accepts(header)})
             except IndexError:
-                print('index error happened')
+                # print('index error happened')
                 continue
         elif b'Authorization:' in header:
             if auth:
@@ -689,12 +689,11 @@ def main(argv):
                 data = data.decode('unicode_escape').encode("raw_unicode_escape")
                 if b'\r\n\r\n\r\n' in data:
                     data = data[:-2]
-                requests = data.split(CRLFCRLF)[:-1]
-                print(requests)
+                requests = data.split(CRLFCRLF)
                 payloads = []
                 for itr, request in enumerate(requests):
-                    print('checking request')
-                    print(request)
+                    # print('checking request')
+                    # print(request)
                     request_line = request.split(CRLF)[0]
                     if re.match("[A-Z]* (.)* HTTP/\d\.\d", request_line.decode('utf-8')):
                         continue
@@ -709,7 +708,7 @@ def main(argv):
                         conn.close()
                         print(str(e))
                         break
-                    print(allow)
+                    # print(allow)
                     # for thing in allow:
                     #     conn.send(thing.encode('ascii'))
                     
